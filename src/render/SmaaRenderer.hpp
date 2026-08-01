@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shaders/SmaaShader.hpp"
+#include "FullscreenQuad.hpp"
 
 #include <Geode/cocos/platform/CCGL.h>
 #include <array>
@@ -28,7 +29,6 @@ namespace aa::render {
         bool validateFramebuffer(GLuint texture);
         void bindIntermediateFramebuffer();
         void attachIntermediateTexture(GLuint texture);
-        void drawFullscreen();
         void destroyResources();
 
         shaders::SmaaShaderSet const* m_shaders = nullptr;
@@ -39,7 +39,7 @@ namespace aa::render {
         GLuint m_areaTexture = 0;
         GLuint m_searchTexture = 0;
         GLuint m_framebuffer = 0;
-        GLuint m_vbo = 0;
+        FullscreenQuad m_quad;
         GLsizei m_width = 0;
         GLsizei m_height = 0;
         bool m_coreFramebufferApi = false;

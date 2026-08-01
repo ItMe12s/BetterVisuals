@@ -56,22 +56,21 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void swapBuffers() {
         static aa::render::PostProcessRenderer postProcessRenderer;
         static aa::render::SmaaRenderer smaaRenderer;
+        static auto renderedMode = AntiAliasingMode::Off;
 
-        switch (g_antiAliasingMode.load(std::memory_order_relaxed)) {
-            case AntiAliasingMode::Fxaa:
-                smaaRenderer.reset();
-                postProcessRenderer.apply(aa::shaders::kFxaaShader);
-                break;
+        auto const selectedMode = g_antiAliasingMode.load(std::memory_order_relaxed);
+        if (selectedMode != renderedMode) {
+            postProcessRenderer.reset();
+            smaaRenderer.reset();
+            renderedMode = selectedMode;
+        }
 
-            case AntiAliasingMode::Smaa:
-                postProcessRenderer.reset();
-                smaaRenderer.apply(aa::shaders::kSmaaShaderSet);
-                break;
+        switch (selectedMode) {
+            case AntiAliasingMode::Fxaa: postProcessRenderer.apply(aa::shaders::kFxaaShader); break;
 
-            case AntiAliasingMode::Off:
-                postProcessRenderer.reset();
-                smaaRenderer.reset();
-                break;
+            case AntiAliasingMode::Smaa: smaaRenderer.apply(aa::shaders::kSmaaShaderSet); break;
+
+            case AntiAliasingMode::Off: break;
         }
 
         CCEGLView::swapBuffers();

@@ -1,152 +1,16 @@
 #include "SmaaRenderer.hpp"
 
 #include "../shaders/SmaaLookupTextures.hpp"
-#include "../shaders/SmaaShader.hpp"
 #include "GlStateGuard.hpp"
+#include "ShaderProgram.hpp"
 
 #include <Geode/Geode.hpp>
 #include <array>
 #include <cstddef>
-#include <string>
-#include <string_view>
-#include <vector>
 
 using namespace geode::prelude;
 
 namespace {
-
-    struct Vertex {
-        GLfloat position[2];
-        GLfloat texCoord[2];
-    };
-
-    constexpr std::array<Vertex, 4> kFullscreenQuad = {{
-        {{-1.f, -1.f}, {0.f, 0.f}},
-        {{1.f, -1.f}, {1.f, 0.f}},
-        {{-1.f, 1.f}, {0.f, 1.f}},
-        {{1.f, 1.f}, {1.f, 1.f}},
-    }};
-
-    std::string shaderLog(GLuint shader) {
-        GLint length = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-        if (length <= 1) {
-            return {};
-        }
-
-        std::vector<GLchar> buffer(static_cast<std::size_t>(length));
-        glGetShaderInfoLog(shader, length, nullptr, buffer.data());
-        return buffer.data();
-    }
-
-    std::string programLog(GLuint program) {
-        GLint length = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-        if (length <= 1) {
-            return {};
-        }
-
-        std::vector<GLchar> buffer(static_cast<std::size_t>(length));
-        glGetProgramInfoLog(program, length, nullptr, buffer.data());
-        return buffer.data();
-    }
-
-    GLuint compileShader(
-        GLenum type, aa::shaders::SmaaShaderSet const& shaders, std::string_view stageDefines,
-        std::string_view mainSource, std::string_view programName, char const* stageName
-    ) {
-        auto shader = glCreateShader(type);
-        if (shader == 0) {
-            log::error("Unable to create the {} {} shader", programName, stageName);
-            return 0;
-        }
-
-        std::array<std::string_view, 5> const sources = {
-            shaders.version,
-            shaders.portDefines,
-            stageDefines,
-            shaders.library,
-            mainSource,
-        };
-        std::array<GLchar const*, 5> sourceData = {};
-        std::array<GLint, 5> sourceLengths = {};
-        for (std::size_t index = 0; index < sources.size(); ++index) {
-            sourceData[index] = sources[index].data();
-            sourceLengths[index] = static_cast<GLint>(sources[index].size());
-        }
-        glShaderSource(
-            shader, static_cast<GLsizei>(sourceData.size()), sourceData.data(), sourceLengths.data()
-        );
-        glCompileShader(shader);
-
-        GLint compiled = GL_FALSE;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-        if (compiled != GL_TRUE) {
-            log::error(
-                "{} {} shader compilation failed: {}", programName, stageName, shaderLog(shader)
-            );
-            glDeleteShader(shader);
-            return 0;
-        }
-        return shader;
-    }
-
-    GLuint compileProgram(
-        aa::shaders::SmaaShaderSet const& shaders, aa::shaders::smaa::ProgramSource const& source
-    ) {
-        auto vertexShader = compileShader(
-            GL_VERTEX_SHADER,
-            shaders,
-            shaders.vertexDefines,
-            source.vertexMain,
-            source.name,
-            "vertex"
-        );
-        if (vertexShader == 0) {
-            return 0;
-        }
-
-        auto fragmentShader = compileShader(
-            GL_FRAGMENT_SHADER,
-            shaders,
-            shaders.fragmentDefines,
-            source.fragmentMain,
-            source.name,
-            "fragment"
-        );
-        if (fragmentShader == 0) {
-            glDeleteShader(vertexShader);
-            return 0;
-        }
-
-        auto program = glCreateProgram();
-        if (program != 0) {
-            glAttachShader(program, vertexShader);
-            glAttachShader(program, fragmentShader);
-            glBindAttribLocation(program, aa::render::kPositionAttribute, "a_position");
-            glBindAttribLocation(program, aa::render::kTexCoordAttribute, "a_texCoord");
-            glLinkProgram(program);
-        }
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
-
-        GLint linked = GL_FALSE;
-        if (program != 0) {
-            glGetProgramiv(program, GL_LINK_STATUS, &linked);
-        }
-        if (linked != GL_TRUE) {
-            log::error(
-                "{} shader link failed: {}",
-                source.name,
-                program == 0 ? "unable to create program" : programLog(program)
-            );
-            if (program != 0) {
-                glDeleteProgram(program);
-            }
-            return 0;
-        }
-        return program;
-    }
 
     void configureTexture(GLuint texture) {
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -189,7 +53,23 @@ namespace aa::render {
         }
 
         for (std::size_t index = 0; index < m_programs.size(); ++index) {
-            m_programs[index].handle = compileProgram(shaders, shaders.programs[index]);
+            auto const& source = shaders.programs[index];
+            std::array vertexSources{
+                shaders.versionSource,
+                shaders.commonSource,
+                shaders.vertexStageSource,
+                shaders.algorithmSource,
+                source.vertexMain,
+            };
+            std::array fragmentSources{
+                shaders.versionSource,
+                shaders.commonSource,
+                shaders.fragmentStageSource,
+                shaders.algorithmSource,
+                source.fragmentMain,
+            };
+            m_programs[index].handle =
+                compileShaderProgram(source.name, vertexSources, fragmentSources);
             if (m_programs[index].handle == 0) {
                 destroyResources();
                 m_failed = true;
@@ -219,6 +99,16 @@ namespace aa::render {
             return false;
         }
 
+        glUseProgram(m_programs[0].handle);
+        glUniform1i(m_programs[0].textures[0], 0);
+        glUseProgram(m_programs[1].handle);
+        glUniform1i(m_programs[1].textures[0], 0);
+        glUniform1i(m_programs[1].textures[1], 1);
+        glUniform1i(m_programs[1].textures[2], 2);
+        glUseProgram(m_programs[2].handle);
+        glUniform1i(m_programs[2].textures[0], 0);
+        glUniform1i(m_programs[2].textures[1], 1);
+
         std::array<GLuint*, 5> textureHandles = {
             &m_sourceTexture,
             &m_edgeTexture,
@@ -231,7 +121,6 @@ namespace aa::render {
         for (std::size_t index = 0; index < textures.size(); ++index) {
             *textureHandles[index] = textures[index];
         }
-        glGenBuffers(1, &m_vbo);
         if (m_coreFramebufferApi) {
             glGenFramebuffers(1, &m_framebuffer);
         }
@@ -239,8 +128,13 @@ namespace aa::render {
             glGenFramebuffersEXT(1, &m_framebuffer);
         }
         if (m_sourceTexture == 0 || m_edgeTexture == 0 || m_weightTexture == 0 ||
-            m_areaTexture == 0 || m_searchTexture == 0 || m_vbo == 0 || m_framebuffer == 0) {
+            m_areaTexture == 0 || m_searchTexture == 0 || m_framebuffer == 0) {
             log::error("Unable to allocate SMAA OpenGL objects");
+            destroyResources();
+            m_failed = true;
+            return false;
+        }
+        if (!m_quad.initialize("SMAA")) {
             destroyResources();
             m_failed = true;
             return false;
@@ -294,22 +188,6 @@ namespace aa::render {
             return false;
         }
 
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(sizeof(kFullscreenQuad)),
-            kFullscreenQuad.data(),
-            GL_STATIC_DRAW
-        );
-        GLint bufferSize = 0;
-        glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufferSize);
-        if (bufferSize != static_cast<GLint>(sizeof(kFullscreenQuad))) {
-            log::error("Unable to upload the SMAA fullscreen quad");
-            destroyResources();
-            m_failed = true;
-            return false;
-        }
-
         return true;
     }
 
@@ -336,6 +214,17 @@ namespace aa::render {
             destroyResources();
             m_failed = true;
             return false;
+        }
+
+        for (auto const& program : m_programs) {
+            glUseProgram(program.handle);
+            glUniform4f(
+                program.metrics,
+                1.f / static_cast<GLfloat>(width),
+                1.f / static_cast<GLfloat>(height),
+                static_cast<GLfloat>(width),
+                static_cast<GLfloat>(height)
+            );
         }
 
         m_width = width;
@@ -373,35 +262,12 @@ namespace aa::render {
         }
     }
 
-    void SmaaRenderer::drawFullscreen() {
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glEnableVertexAttribArray(kPositionAttribute);
-        glEnableVertexAttribArray(kTexCoordAttribute);
-        glVertexAttribPointer(
-            kPositionAttribute,
-            2,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(Vertex),
-            reinterpret_cast<void*>(offsetof(Vertex, position))
-        );
-        glVertexAttribPointer(
-            kTexCoordAttribute,
-            2,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(Vertex),
-            reinterpret_cast<void*>(offsetof(Vertex, texCoord))
-        );
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, static_cast<GLsizei>(kFullscreenQuad.size()));
-    }
-
     void SmaaRenderer::apply(shaders::SmaaShaderSet const& shaders) {
         if (m_failed && m_shaders == &shaders) {
             return;
         }
 
-        GlStateGuard state;
+        GlStateGuard state{GlStateProfile::Smaa};
         glActiveTexture(GL_TEXTURE0);
         auto const& viewport = state.viewport();
         auto const width = static_cast<GLsizei>(viewport[2]);
@@ -426,54 +292,33 @@ namespace aa::render {
             glDisable(GL_FRAMEBUFFER_SRGB);
         }
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        glDepthMask(GL_FALSE);
         glClearColor(0.f, 0.f, 0.f, 0.f);
         glViewport(0, 0, width, height);
-
-        auto const setMetrics = [&](Program const& program) {
-            glUseProgram(program.handle);
-            glUniform4f(
-                program.metrics,
-                1.f / static_cast<GLfloat>(width),
-                1.f / static_cast<GLfloat>(height),
-                static_cast<GLfloat>(width),
-                static_cast<GLfloat>(height)
-            );
-        };
+        m_quad.bind();
 
         bindIntermediateFramebuffer();
         attachIntermediateTexture(m_edgeTexture);
         glClear(GL_COLOR_BUFFER_BIT);
-        setMetrics(m_programs[0]);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_sourceTexture);
-        glUniform1i(m_programs[0].textures[0], 0);
-        drawFullscreen();
+        glUseProgram(m_programs[0].handle);
+        m_quad.draw();
 
         attachIntermediateTexture(m_weightTexture);
-        glClear(GL_COLOR_BUFFER_BIT);
-        setMetrics(m_programs[1]);
-        glActiveTexture(GL_TEXTURE0);
+        glUseProgram(m_programs[1].handle);
         glBindTexture(GL_TEXTURE_2D, m_edgeTexture);
-        glUniform1i(m_programs[1].textures[0], 0);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_areaTexture);
-        glUniform1i(m_programs[1].textures[1], 1);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, m_searchTexture);
-        glUniform1i(m_programs[1].textures[2], 2);
-        drawFullscreen();
+        m_quad.draw();
 
         state.bindOriginalDrawFramebuffer();
         glViewport(viewport[0], viewport[1], width, height);
-        setMetrics(m_programs[2]);
+        glUseProgram(m_programs[2].handle);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_sourceTexture);
-        glUniform1i(m_programs[2].textures[0], 0);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_weightTexture);
-        glUniform1i(m_programs[2].textures[1], 1);
-        drawFullscreen();
+        m_quad.draw();
     }
 
     void SmaaRenderer::reset() {
@@ -483,10 +328,7 @@ namespace aa::render {
     }
 
     void SmaaRenderer::destroyResources() {
-        if (m_vbo != 0) {
-            glDeleteBuffers(1, &m_vbo);
-            m_vbo = 0;
-        }
+        m_quad.reset();
         if (m_framebuffer != 0) {
             if (m_coreFramebufferApi) {
                 glDeleteFramebuffers(1, &m_framebuffer);
@@ -504,11 +346,7 @@ namespace aa::render {
             m_areaTexture,
             m_searchTexture,
         };
-        for (auto texture : textures) {
-            if (texture != 0) {
-                glDeleteTextures(1, &texture);
-            }
-        }
+        glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
         m_sourceTexture = 0;
         m_edgeTexture = 0;
         m_weightTexture = 0;
@@ -523,6 +361,7 @@ namespace aa::render {
         }
         m_width = 0;
         m_height = 0;
+        m_coreFramebufferApi = false;
     }
 
 } // namespace aa::render

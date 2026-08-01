@@ -1,5 +1,7 @@
 #include "GlStateGuard.hpp"
 
+#include "FullscreenQuad.hpp"
+
 #include <cassert>
 #include <cstddef>
 
@@ -49,12 +51,14 @@ namespace {
 
 namespace aa::render {
 
-    GlState captureGlState() {
+    GlState captureGlState(GlStateProfile profile) {
         GlState state;
+        state.profile = profile;
         glGetIntegerv(GL_CURRENT_PROGRAM, &state.program);
         glGetIntegerv(GL_ACTIVE_TEXTURE, &state.activeTexture);
 
-        for (std::size_t index = 0; index < state.textures2D.size(); ++index) {
+        auto const textureCount = profile == GlStateProfile::Smaa ? state.textures2D.size() : 1;
+        for (std::size_t index = 0; index < textureCount; ++index) {
             glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(index));
             glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.textures2D[index]);
         }
@@ -62,24 +66,28 @@ namespace aa::render {
 
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &state.arrayBuffer);
         glGetIntegerv(GL_VIEWPORT, state.viewport.data());
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, state.clearColor.data());
+        if (profile == GlStateProfile::Smaa) {
+            glGetFloatv(GL_COLOR_CLEAR_VALUE, state.clearColor.data());
+        }
         glGetBooleanv(GL_COLOR_WRITEMASK, state.colorMask.data());
-        glGetBooleanv(GL_DEPTH_WRITEMASK, &state.depthMask);
         state.blend = glIsEnabled(GL_BLEND);
         state.depthTest = glIsEnabled(GL_DEPTH_TEST);
         state.stencilTest = glIsEnabled(GL_STENCIL_TEST);
         state.scissorTest = glIsEnabled(GL_SCISSOR_TEST);
         state.cullFace = glIsEnabled(GL_CULL_FACE);
 
-        state.separateFramebufferBindings = GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object;
-        state.framebufferSupported = state.separateFramebufferBindings || GLEW_EXT_framebuffer_object;
-        if (state.separateFramebufferBindings) {
-            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &state.readFramebuffer);
-            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &state.drawFramebuffer);
-        }
-        else if (state.framebufferSupported) {
-            glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &state.drawFramebuffer);
-            state.readFramebuffer = state.drawFramebuffer;
+        if (profile == GlStateProfile::Smaa) {
+            state.separateFramebufferBindings = GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object;
+            state.framebufferSupported =
+                state.separateFramebufferBindings || GLEW_EXT_framebuffer_object;
+            if (state.separateFramebufferBindings) {
+                glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &state.readFramebuffer);
+                glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &state.drawFramebuffer);
+            }
+            else if (state.framebufferSupported) {
+                glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &state.drawFramebuffer);
+                state.readFramebuffer = state.drawFramebuffer;
+            }
         }
 
         state.framebufferSrgbSupported =
@@ -88,37 +96,39 @@ namespace aa::render {
             state.framebufferSrgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
         }
 
-        state.attributes[0] = captureVertexAttribute(kPositionAttribute);
-        state.attributes[1] = captureVertexAttribute(kTexCoordAttribute);
+        state.attributes[0] = captureVertexAttribute(FullscreenQuad::kPositionAttribute);
+        state.attributes[1] = captureVertexAttribute(FullscreenQuad::kTexCoordAttribute);
         return state;
     }
 
     void restoreGlState(GlState const& state) {
-        restoreVertexAttribute(kPositionAttribute, state.attributes[0]);
-        restoreVertexAttribute(kTexCoordAttribute, state.attributes[1]);
+        restoreVertexAttribute(FullscreenQuad::kPositionAttribute, state.attributes[0]);
+        restoreVertexAttribute(FullscreenQuad::kTexCoordAttribute, state.attributes[1]);
         glBindBuffer(GL_ARRAY_BUFFER, state.arrayBuffer);
 
-        for (std::size_t index = 0; index < state.textures2D.size(); ++index) {
+        auto const textureCount = state.profile == GlStateProfile::Smaa ? state.textures2D.size() : 1;
+        for (std::size_t index = 0; index < textureCount; ++index) {
             glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(index));
             glBindTexture(GL_TEXTURE_2D, state.textures2D[index]);
         }
         glActiveTexture(state.activeTexture);
         glUseProgram(state.program);
 
-        if (state.separateFramebufferBindings) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, state.readFramebuffer);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, state.drawFramebuffer);
-        }
-        else if (state.framebufferSupported) {
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, state.drawFramebuffer);
-        }
+        if (state.profile == GlStateProfile::Smaa) {
+            if (state.separateFramebufferBindings) {
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, state.readFramebuffer);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, state.drawFramebuffer);
+            }
+            else if (state.framebufferSupported) {
+                glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, state.drawFramebuffer);
+            }
 
-        glViewport(state.viewport[0], state.viewport[1], state.viewport[2], state.viewport[3]);
-        glClearColor(
-            state.clearColor[0], state.clearColor[1], state.clearColor[2], state.clearColor[3]
-        );
+            glViewport(state.viewport[0], state.viewport[1], state.viewport[2], state.viewport[3]);
+            glClearColor(
+                state.clearColor[0], state.clearColor[1], state.clearColor[2], state.clearColor[3]
+            );
+        }
         glColorMask(state.colorMask[0], state.colorMask[1], state.colorMask[2], state.colorMask[3]);
-        glDepthMask(state.depthMask);
         restoreCapability(GL_BLEND, state.blend);
         restoreCapability(GL_DEPTH_TEST, state.depthTest);
         restoreCapability(GL_STENCIL_TEST, state.stencilTest);
@@ -129,12 +139,12 @@ namespace aa::render {
         }
     }
 
-    GlStateGuard::GlStateGuard() : m_state(captureGlState()) {}
+    GlStateGuard::GlStateGuard(GlStateProfile profile) : m_state(captureGlState(profile)) {}
 
     GlStateGuard::~GlStateGuard() {
         restoreGlState(m_state);
 #ifndef NDEBUG
-        auto const restored = captureGlState();
+        auto const restored = captureGlState(m_state.profile);
         assert((restored == m_state) && "Anti-aliasing renderer failed to restore OpenGL state");
 #endif
     }
@@ -144,6 +154,7 @@ namespace aa::render {
     }
 
     void GlStateGuard::bindOriginalReadFramebuffer() const {
+        assert(m_state.profile == GlStateProfile::Smaa);
         if (m_state.separateFramebufferBindings) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER, m_state.readFramebuffer);
         }
@@ -153,6 +164,7 @@ namespace aa::render {
     }
 
     void GlStateGuard::bindOriginalDrawFramebuffer() const {
+        assert(m_state.profile == GlStateProfile::Smaa);
         if (m_state.separateFramebufferBindings) {
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_state.drawFramebuffer);
         }

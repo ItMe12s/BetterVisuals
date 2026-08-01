@@ -1,78 +1,12 @@
 #include "PostProcessRenderer.hpp"
 
 #include "GlStateGuard.hpp"
+#include "ShaderProgram.hpp"
 
 #include <Geode/Geode.hpp>
 #include <array>
-#include <cstddef>
-#include <string>
-#include <vector>
 
 using namespace geode::prelude;
-
-namespace {
-
-    struct Vertex {
-        GLfloat position[2];
-        GLfloat texCoord[2];
-    };
-
-    constexpr std::array<Vertex, 4> kFullscreenQuad = {{
-        {{-1.f, -1.f}, {0.f, 0.f}},
-        {{1.f, -1.f}, {1.f, 0.f}},
-        {{-1.f, 1.f}, {0.f, 1.f}},
-        {{1.f, 1.f}, {1.f, 1.f}},
-    }};
-
-    std::string shaderLog(GLuint shader) {
-        GLint length = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-        if (length <= 1) {
-            return {};
-        }
-
-        std::vector<GLchar> buffer(static_cast<std::size_t>(length));
-        glGetShaderInfoLog(shader, length, nullptr, buffer.data());
-        return buffer.data();
-    }
-
-    std::string programLog(GLuint program) {
-        GLint length = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-        if (length <= 1) {
-            return {};
-        }
-
-        std::vector<GLchar> buffer(static_cast<std::size_t>(length));
-        glGetProgramInfoLog(program, length, nullptr, buffer.data());
-        return buffer.data();
-    }
-
-    GLuint compileShader(
-        GLenum type, std::string_view source, std::string_view shaderName, char const* stageName
-    ) {
-        auto shader = glCreateShader(type);
-        if (shader == 0) {
-            log::error("Unable to create the {} {} shader", shaderName, stageName);
-            return 0;
-        }
-
-        auto const* sourceData = source.data();
-        auto const sourceLength = static_cast<GLint>(source.size());
-        glShaderSource(shader, 1, &sourceData, &sourceLength);
-        glCompileShader(shader);
-
-        GLint compiled = GL_FALSE;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-        if (compiled != GL_TRUE) {
-            log::error("{} {} shader compilation failed: {}", shaderName, stageName, shaderLog(shader));
-            glDeleteShader(shader);
-            return 0;
-        }
-        return shader;
-    }
-
-} // namespace
 
 namespace aa::render {
 
@@ -85,48 +19,14 @@ namespace aa::render {
         if (m_failed) {
             return false;
         }
-        if (m_program != 0 && m_texture != 0 && m_vbo != 0) {
+        if (m_program != 0 && m_texture != 0) {
             return true;
         }
 
-        auto vertexShader =
-            compileShader(GL_VERTEX_SHADER, shader.vertexSource, shader.name, "vertex");
-        if (vertexShader == 0) {
-            m_failed = true;
-            return false;
-        }
-
-        auto fragmentShader =
-            compileShader(GL_FRAGMENT_SHADER, shader.fragmentSource, shader.name, "fragment");
-        if (fragmentShader == 0) {
-            glDeleteShader(vertexShader);
-            m_failed = true;
-            return false;
-        }
-
-        m_program = glCreateProgram();
-        if (m_program != 0) {
-            glAttachShader(m_program, vertexShader);
-            glAttachShader(m_program, fragmentShader);
-            glBindAttribLocation(m_program, kPositionAttribute, "a_position");
-            glBindAttribLocation(m_program, kTexCoordAttribute, "a_texCoord");
-            glLinkProgram(m_program);
-        }
-
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
-
-        GLint linked = GL_FALSE;
-        if (m_program != 0) {
-            glGetProgramiv(m_program, GL_LINK_STATUS, &linked);
-        }
-        if (linked != GL_TRUE) {
-            log::error(
-                "{} shader link failed: {}",
-                shader.name,
-                m_program == 0 ? "unable to create program" : programLog(m_program)
-            );
-            destroyResources();
+        std::array vertexSources{shader.vertexSource};
+        std::array fragmentSources{shader.fragmentSource};
+        m_program = compileShaderProgram(shader.name, vertexSources, fragmentSources);
+        if (m_program == 0) {
             m_failed = true;
             return false;
         }
@@ -140,10 +40,17 @@ namespace aa::render {
             return false;
         }
 
+        glUseProgram(m_program);
+        glUniform1i(m_textureUniform, 0);
+
         glGenTextures(1, &m_texture);
-        glGenBuffers(1, &m_vbo);
-        if (m_texture == 0 || m_vbo == 0) {
+        if (m_texture == 0) {
             log::error("Unable to allocate post-process OpenGL objects");
+            destroyResources();
+            m_failed = true;
+            return false;
+        }
+        if (!m_quad.initialize("post-process")) {
             destroyResources();
             m_failed = true;
             return false;
@@ -154,23 +61,6 @@ namespace aa::render {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(sizeof(kFullscreenQuad)),
-            kFullscreenQuad.data(),
-            GL_STATIC_DRAW
-        );
-
-        GLint bufferSize = 0;
-        glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufferSize);
-        if (bufferSize != static_cast<GLint>(sizeof(kFullscreenQuad))) {
-            log::error("Unable to upload the post-process fullscreen quad");
-            destroyResources();
-            m_failed = true;
-            return false;
-        }
 
         return true;
     }
@@ -194,6 +84,10 @@ namespace aa::render {
             return false;
         }
 
+        glUseProgram(m_program);
+        glUniform2f(
+            m_invResolutionUniform, 1.f / static_cast<GLfloat>(width), 1.f / static_cast<GLfloat>(height)
+        );
         m_width = width;
         m_height = height;
         return true;
@@ -204,7 +98,7 @@ namespace aa::render {
             return;
         }
 
-        GlStateGuard state;
+        GlStateGuard state{GlStateProfile::PostProcess};
         glActiveTexture(GL_TEXTURE0);
         auto const& viewport = state.viewport();
         auto const width = static_cast<GLsizei>(viewport[2]);
@@ -220,40 +114,19 @@ namespace aa::render {
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, viewport[0], viewport[1], width, height);
 
         glUseProgram(m_program);
-        glUniform1i(m_textureUniform, 0);
-        glUniform2f(
-            m_invResolutionUniform, 1.f / static_cast<GLfloat>(width), 1.f / static_cast<GLfloat>(height)
-        );
 
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_CULL_FACE);
+        if (GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_sRGB || GLEW_EXT_framebuffer_sRGB) {
+            glDisable(GL_FRAMEBUFFER_SRGB);
+        }
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        glDepthMask(GL_FALSE);
-        glViewport(viewport[0], viewport[1], width, height);
 
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glEnableVertexAttribArray(kPositionAttribute);
-        glEnableVertexAttribArray(kTexCoordAttribute);
-        glVertexAttribPointer(
-            kPositionAttribute,
-            2,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(Vertex),
-            reinterpret_cast<void*>(offsetof(Vertex, position))
-        );
-        glVertexAttribPointer(
-            kTexCoordAttribute,
-            2,
-            GL_FLOAT,
-            GL_FALSE,
-            sizeof(Vertex),
-            reinterpret_cast<void*>(offsetof(Vertex, texCoord))
-        );
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, static_cast<GLsizei>(kFullscreenQuad.size()));
+        m_quad.bind();
+        m_quad.draw();
     }
 
     void PostProcessRenderer::reset() {
@@ -263,10 +136,7 @@ namespace aa::render {
     }
 
     void PostProcessRenderer::destroyResources() {
-        if (m_vbo != 0) {
-            glDeleteBuffers(1, &m_vbo);
-            m_vbo = 0;
-        }
+        m_quad.reset();
         if (m_texture != 0) {
             glDeleteTextures(1, &m_texture);
             m_texture = 0;

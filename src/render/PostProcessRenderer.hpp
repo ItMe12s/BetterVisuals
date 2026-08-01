@@ -1,5 +1,7 @@
 #pragma once
 
+#include "FullscreenQuad.hpp"
+
 #include <Geode/cocos/platform/CCGL.h>
 #include <string_view>
 
@@ -28,7 +30,7 @@ namespace aa::render {
         PostProcessShader const* m_shader = nullptr;
         GLuint m_program = 0;
         GLuint m_texture = 0;
-        GLuint m_vbo = 0;
+        FullscreenQuad m_quad;
         GLint m_textureUniform = -1;
         GLint m_invResolutionUniform = -1;
         GLsizei m_width = 0;

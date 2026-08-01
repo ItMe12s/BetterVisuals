@@ -5,8 +5,10 @@
 
 namespace aa::render {
 
-    constexpr GLuint kPositionAttribute = 0;
-    constexpr GLuint kTexCoordAttribute = 1;
+    enum class GlStateProfile {
+        PostProcess,
+        Smaa,
+    };
 
     struct VertexAttributeState {
         GLint enabled = GL_FALSE;
@@ -21,6 +23,7 @@ namespace aa::render {
     };
 
     struct GlState {
+        GlStateProfile profile = GlStateProfile::PostProcess;
         GLint program = 0;
         GLint activeTexture = GL_TEXTURE0;
         std::array<GLint, 3> textures2D = {};
@@ -28,7 +31,6 @@ namespace aa::render {
         std::array<GLint, 4> viewport = {};
         std::array<GLfloat, 4> clearColor = {};
         std::array<GLboolean, 4> colorMask = {};
-        GLboolean depthMask = GL_TRUE;
         GLboolean blend = GL_FALSE;
         GLboolean depthTest = GL_FALSE;
         GLboolean stencilTest = GL_FALSE;
@@ -45,12 +47,12 @@ namespace aa::render {
         bool operator==(GlState const&) const = default;
     };
 
-    GlState captureGlState();
+    GlState captureGlState(GlStateProfile profile);
     void restoreGlState(GlState const& state);
 
     class GlStateGuard final {
     public:
-        GlStateGuard();
+        explicit GlStateGuard(GlStateProfile profile);
         ~GlStateGuard();
 
         GlStateGuard(GlStateGuard const&) = delete;
