@@ -1,5 +1,7 @@
 #include "render/PostProcessRenderer.hpp"
+#include "render/SmaaRenderer.hpp"
 #include "shaders/FxaaShader.hpp"
+#include "shaders/SmaaShader.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
@@ -14,18 +16,23 @@ namespace {
     enum class AntiAliasingMode {
         Off,
         Fxaa,
+        Smaa,
     };
 
-    std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::Fxaa;
+    std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::Smaa;
 
     void updateAntiAliasingMode(std::string_view value) {
+        if (value == "SMAA") {
+            g_antiAliasingMode.store(AntiAliasingMode::Smaa, std::memory_order_relaxed);
+            return;
+        }
         if (value == "FXAA") {
             g_antiAliasingMode.store(AntiAliasingMode::Fxaa, std::memory_order_relaxed);
             return;
         }
 
         if (value != "Off") {
-            log::warn("Unknown AA mode '{}'; disabling AA", value);
+            log::warn("Unknown AA mode '{}', disabling AA", value);
         }
         g_antiAliasingMode.store(AntiAliasingMode::Off, std::memory_order_relaxed);
     }
@@ -47,12 +54,24 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     }
 
     void swapBuffers() {
-        static aa::render::PostProcessRenderer renderer;
-        if (g_antiAliasingMode.load(std::memory_order_relaxed) == AntiAliasingMode::Fxaa) {
-            renderer.apply(aa::shaders::kFxaaShader);
-        }
-        else {
-            renderer.reset();
+        static aa::render::PostProcessRenderer postProcessRenderer;
+        static aa::render::SmaaRenderer smaaRenderer;
+
+        switch (g_antiAliasingMode.load(std::memory_order_relaxed)) {
+            case AntiAliasingMode::Fxaa:
+                smaaRenderer.reset();
+                postProcessRenderer.apply(aa::shaders::kFxaaShader);
+                break;
+
+            case AntiAliasingMode::Smaa:
+                postProcessRenderer.reset();
+                smaaRenderer.apply(aa::shaders::kSmaaShaderSet);
+                break;
+
+            case AntiAliasingMode::Off:
+                postProcessRenderer.reset();
+                smaaRenderer.reset();
+                break;
         }
 
         CCEGLView::swapBuffers();
