@@ -1,7 +1,7 @@
 #include "SmaaShader.hpp"
 
 /*
- * SMAA 1x High GLSL 1.20 port.
+ * SMAA 1x High and Ultra GLSL 1.20 port.
  *
  * Algorithm and reference implementation:
  * https://www.iryoku.com/smaa/downloads/SMAA-Enhanced-Subpixel-Morphological-Antialiasing.pdf
@@ -20,11 +20,30 @@ namespace aa::shaders::smaa {
     constexpr char kVersionSource[] = R"glsl(#version 120
 )glsl";
 
-    constexpr char kCommonSource[] = R"glsl(
+    constexpr char kHighCommonSource[] = R"glsl(
 uniform vec4 u_metrics;
 
 #define SMAA_RT_METRICS u_metrics
 #define mad(a, b, c) ((a) * (b) + (c))
+
+#define SMAA_THRESHOLD 0.1
+#define SMAA_MAX_SEARCH_STEPS 16
+#define SMAA_MAX_SEARCH_STEPS_DIAG 8
+#define SMAA_CORNER_ROUNDING 25
+#define SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR 2.0
+)glsl";
+
+    constexpr char kUltraCommonSource[] = R"glsl(
+uniform vec4 u_metrics;
+
+#define SMAA_RT_METRICS u_metrics
+#define mad(a, b, c) ((a) * (b) + (c))
+
+#define SMAA_THRESHOLD 0.05
+#define SMAA_MAX_SEARCH_STEPS 32
+#define SMAA_MAX_SEARCH_STEPS_DIAG 16
+#define SMAA_CORNER_ROUNDING 25
+#define SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR 2.0
 )glsl";
 
     constexpr char kVertexStageSource[] = R"glsl(
@@ -66,13 +85,6 @@ uniform vec4 u_metrics;
  * SOFTWARE.
  */
 
-
-// Fixed SMAA 1x High configuration.
-#define SMAA_THRESHOLD 0.1
-#define SMAA_MAX_SEARCH_STEPS 16
-#define SMAA_MAX_SEARCH_STEPS_DIAG 8
-#define SMAA_CORNER_ROUNDING 25
-#define SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR 2.0
 
 #define SMAA_AREATEX_MAX_DISTANCE 16
 #define SMAA_AREATEX_MAX_DISTANCE_DIAG 20
@@ -146,7 +158,7 @@ void SMAAMovc(bvec2 cond, inout vec2 variable, vec2 value) {
 vec2 SMAAColorEdgeDetectionPS(vec2 texcoord,
                                 vec4 offset[3],
                                 sampler2D colorTex) {
-    // Fixed color-edge threshold for SMAA High.
+    // Color-edge threshold from the selected SMAA preset.
     vec2 threshold = vec2(SMAA_THRESHOLD, SMAA_THRESHOLD);
 
     // Calculate color deltas:
@@ -696,21 +708,33 @@ void main() {
 }
 )glsl";
 
-    constexpr ShaderSet kSmaaShaderSet{
+    constexpr std::array<ProgramSource, 3> kPrograms{{
+        {"SMAA edge detection", kEdgeVertexMain, kEdgeFragmentMain},
+        {"SMAA blending weights", kWeightVertexMain, kWeightFragmentMain},
+        {"SMAA neighborhood blending", kNeighborhoodVertexMain, kNeighborhoodFragmentMain},
+    }};
+
+    constexpr ShaderSet kSmaaHighShaderSet{
         kVersionSource,
-        kCommonSource,
+        kHighCommonSource,
         kVertexStageSource,
         kFragmentStageSource,
         kAlgorithmSource,
-        {{
-            {"SMAA edge detection", kEdgeVertexMain, kEdgeFragmentMain},
-            {"SMAA blending weights", kWeightVertexMain, kWeightFragmentMain},
-            {"SMAA neighborhood blending", kNeighborhoodVertexMain, kNeighborhoodFragmentMain},
-        }},
+        kPrograms,
+    };
+
+    constexpr ShaderSet kSmaaUltraShaderSet{
+        kVersionSource,
+        kUltraCommonSource,
+        kVertexStageSource,
+        kFragmentStageSource,
+        kAlgorithmSource,
+        kPrograms,
     };
 
 } // namespace aa::shaders::smaa
 
 namespace aa::shaders {
-    SmaaShaderSet const kSmaaShaderSet = smaa::kSmaaShaderSet;
+    SmaaShaderSet const kSmaaHighShaderSet = smaa::kSmaaHighShaderSet;
+    SmaaShaderSet const kSmaaUltraShaderSet = smaa::kSmaaUltraShaderSet;
 } // namespace aa::shaders

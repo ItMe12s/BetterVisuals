@@ -16,14 +16,19 @@ namespace {
     enum class AntiAliasingMode {
         Off,
         Fxaa,
-        Smaa,
+        SmaaHigh,
+        SmaaUltra,
     };
 
-    std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::Smaa;
+    std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
 
     void updateAntiAliasingMode(std::string_view value) {
-        if (value == "SMAA") {
-            g_antiAliasingMode.store(AntiAliasingMode::Smaa, std::memory_order_relaxed);
+        if (value == "SMAA High") {
+            g_antiAliasingMode.store(AntiAliasingMode::SmaaHigh, std::memory_order_relaxed);
+            return;
+        }
+        if (value == "SMAA Ultra") {
+            g_antiAliasingMode.store(AntiAliasingMode::SmaaUltra, std::memory_order_relaxed);
             return;
         }
         if (value == "FXAA") {
@@ -68,7 +73,13 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
         switch (selectedMode) {
             case AntiAliasingMode::Fxaa: postProcessRenderer.apply(aa::shaders::kFxaaShader); break;
 
-            case AntiAliasingMode::Smaa: smaaRenderer.apply(aa::shaders::kSmaaShaderSet); break;
+            case AntiAliasingMode::SmaaHigh:
+                smaaRenderer.apply(aa::shaders::kSmaaHighShaderSet);
+                break;
+
+            case AntiAliasingMode::SmaaUltra:
+                smaaRenderer.apply(aa::shaders::kSmaaUltraShaderSet);
+                break;
 
             case AntiAliasingMode::Off: break;
         }

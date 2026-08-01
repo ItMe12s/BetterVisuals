@@ -25,6 +25,7 @@ namespace aa::shaders::smaa {
 namespace aa::shaders {
 
     using SmaaShaderSet = smaa::ShaderSet;
-    extern SmaaShaderSet const kSmaaShaderSet;
+    extern SmaaShaderSet const kSmaaHighShaderSet;
+    extern SmaaShaderSet const kSmaaUltraShaderSet;
 
 } // namespace aa::shaders

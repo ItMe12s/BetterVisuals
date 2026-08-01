@@ -13,11 +13,12 @@
 			"type": "string",
 			"name": "Anti-Aliasing",
 			"description": "Fullscreen (game window) anti-aliasing mode.",
-			"default": "SMAA",
+			"default": "SMAA High",
 			"one-of": [
 				"Off",
 				"FXAA",
-				"SMAA"
+				"SMAA High",
+				"SMAA Ultra"
 			]
 		}
 	}
