@@ -1,17 +1,23 @@
 {
 	"geode": "5.8.2",
 	"gd": {
-		"win": "2.2081",
-		"android": "2.2081",
-		"mac": "2.2081",
-		"ios": "2.2081"
+		"win": "2.2081"
 	},
 	"id": "imes.aa-mod",
-	"name": "aa-mod",
+	"name": "Anti-aliasing Mod",
 	"version": "v1.0.0",
 	"developer": "imes",
-	"description": "anti aliasing",
-	"dependencies": {
-		"geode.node-ids": ">=v1.23.3"
+	"description": "Simple anti-aliasing mod.",
+	"settings": {
+		"aa-mode": {
+			"type": "string",
+			"name": "Anti-Aliasing",
+			"description": "Fullscreen (game window) anti-aliasing mode.",
+			"default": "FXAA",
+			"one-of": [
+				"Off",
+				"FXAA"
+			]
+		}
 	}
 }
