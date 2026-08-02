@@ -53,6 +53,12 @@
 			"type": "title",
 			"name": "Fun"
 		},
+		"vhs-enabled": {
+			"type": "bool",
+			"name": "VHS Filter",
+			"description": "Apply an animated VHS-style filter.",
+			"default": false
+		},
 		"crt-enabled": {
 			"type": "bool",
 			"name": "CRT Filter",

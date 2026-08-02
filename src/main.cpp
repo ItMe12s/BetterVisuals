@@ -4,12 +4,14 @@
 #include "shaders/CrtShader.hpp"
 #include "shaders/FxaaShader.hpp"
 #include "shaders/SmaaShader.hpp"
+#include "shaders/VhsShader.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCEGLView.hpp>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <string_view>
 
@@ -27,9 +29,11 @@ namespace {
     std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
+    std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
     aa::render::PostProcessRenderer g_postProcessRenderer;
     aa::render::PostProcessRenderer g_casRenderer;
+    aa::render::PostProcessRenderer g_vhsRenderer;
     aa::render::PostProcessRenderer g_crtRenderer;
     aa::render::SmaaRenderer g_smaaRenderer;
 
@@ -76,6 +80,11 @@ $on_mod(Loaded) {
         updateCasSharpness(value);
     });
 
+    g_vhsEnabled.store(Mod::get()->getSettingValue<bool>("vhs-enabled"), std::memory_order_relaxed);
+    listenForSettingChanges<bool>("vhs-enabled", [](bool value) {
+        g_vhsEnabled.store(value, std::memory_order_relaxed);
+    });
+
     g_crtEnabled.store(Mod::get()->getSettingValue<bool>("crt-enabled"), std::memory_order_relaxed);
     listenForSettingChanges<bool>("crt-enabled", [](bool value) {
         g_crtEnabled.store(value, std::memory_order_relaxed);
@@ -92,10 +101,12 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void swapBuffers() {
         static auto renderedMode = AntiAliasingMode::Off;
         static bool renderedCasEnabled = false;
+        static bool renderedVhsEnabled = false;
         static bool renderedCrtEnabled = false;
 
         auto const selectedMode = g_antiAliasingMode.load(std::memory_order_relaxed);
         auto const casEnabled = g_casEnabled.load(std::memory_order_relaxed);
+        auto const vhsEnabled = g_vhsEnabled.load(std::memory_order_relaxed);
         auto const crtEnabled = g_crtEnabled.load(std::memory_order_relaxed);
         if (selectedMode != renderedMode) {
             g_postProcessRenderer.reset();
@@ -105,6 +116,10 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
         if (casEnabled != renderedCasEnabled) {
             g_casRenderer.reset();
             renderedCasEnabled = casEnabled;
+        }
+        if (vhsEnabled != renderedVhsEnabled) {
+            g_vhsRenderer.reset();
+            renderedVhsEnabled = vhsEnabled;
         }
         if (crtEnabled != renderedCrtEnabled) {
             g_crtRenderer.reset();
@@ -132,6 +147,12 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
                 aa::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
             );
         }
+        if (vhsEnabled) {
+            static auto const clockStart = std::chrono::steady_clock::now();
+            auto const elapsed =
+                std::chrono::duration<GLfloat>(std::chrono::steady_clock::now() - clockStart).count();
+            g_vhsRenderer.apply(aa::shaders::kVhsShader, elapsed);
+        }
         if (crtEnabled) {
             g_crtRenderer.apply(aa::shaders::kCrtShader);
         }
@@ -142,6 +163,7 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void toggleFullScreen(bool value, bool borderless, bool fix) {
         g_postProcessRenderer.reset();
         g_casRenderer.reset();
+        g_vhsRenderer.reset();
         g_crtRenderer.reset();
         g_smaaRenderer.reset();
         CCEGLView::toggleFullScreen(value, borderless, fix);
