@@ -1,4 +1,6 @@
 #include "render/BloomRenderer.hpp"
+#include "render/FramePipeline.hpp"
+#include "render/GlStateGuard.hpp"
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
 #include "shaders/PostProcessShaders.hpp"
@@ -12,7 +14,6 @@
     #include <Geode/modify/AppDelegate.hpp>
 #endif
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -38,7 +39,7 @@ namespace {
     std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
-    bv::render::CaptureTexture g_captureTexture;
+    bv::render::FramePipeline g_framePipeline;
     bv::render::PostProcessRenderer g_postProcessRenderer;
     bv::render::PostProcessRenderer g_casRenderer;
     bv::render::BloomRenderer g_bloomRenderer;
@@ -51,7 +52,7 @@ namespace {
     bool g_pipelineFailed = false;
 
     void resetRenderResources() {
-        g_captureTexture.reset();
+        g_framePipeline.reset();
         g_postProcessRenderer.reset();
         g_casRenderer.reset();
         g_bloomRenderer.reset();
@@ -175,45 +176,35 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
         auto const ditheringEnabled = g_ditheringEnabled.load(std::memory_order_relaxed);
         auto const vhsEnabled = g_vhsEnabled.load(std::memory_order_relaxed);
         auto const crtEnabled = g_crtEnabled.load(std::memory_order_relaxed);
+        bool configurationChanged = false;
         if (selectedMode != renderedMode) {
             g_postProcessRenderer.reset();
             g_smaaRenderer.reset();
             renderedMode = selectedMode;
+            configurationChanged = true;
         }
-        if (casEnabled != renderedCasEnabled) {
-            g_casRenderer.reset();
-            renderedCasEnabled = casEnabled;
-        }
-        if (bloomEnabled != renderedBloomEnabled) {
-            g_bloomRenderer.reset();
-            renderedBloomEnabled = bloomEnabled;
-        }
-        if (grayscaleEnabled != renderedGrayscaleEnabled) {
-            g_grayscaleRenderer.reset();
-            renderedGrayscaleEnabled = grayscaleEnabled;
-        }
-        if (pixelateEnabled != renderedPixelateEnabled) {
-            g_pixelateRenderer.reset();
-            renderedPixelateEnabled = pixelateEnabled;
-        }
-        if (ditheringEnabled != renderedDitheringEnabled) {
-            g_ditheringRenderer.reset();
-            renderedDitheringEnabled = ditheringEnabled;
-        }
-        if (vhsEnabled != renderedVhsEnabled) {
-            g_vhsRenderer.reset();
-            renderedVhsEnabled = vhsEnabled;
-        }
-        if (crtEnabled != renderedCrtEnabled) {
-            g_crtRenderer.reset();
-            renderedCrtEnabled = crtEnabled;
+        auto resetChanged = [](bool selected, bool& rendered, auto& renderer) {
+            if (selected == rendered) {
+                return false;
+            }
+            renderer.reset();
+            rendered = selected;
+            return true;
+        };
+        configurationChanged |= resetChanged(casEnabled, renderedCasEnabled, g_casRenderer);
+        configurationChanged |= resetChanged(bloomEnabled, renderedBloomEnabled, g_bloomRenderer);
+        configurationChanged |=
+            resetChanged(grayscaleEnabled, renderedGrayscaleEnabled, g_grayscaleRenderer);
+        configurationChanged |=
+            resetChanged(pixelateEnabled, renderedPixelateEnabled, g_pixelateRenderer);
+        configurationChanged |=
+            resetChanged(ditheringEnabled, renderedDitheringEnabled, g_ditheringRenderer);
+        configurationChanged |= resetChanged(vhsEnabled, renderedVhsEnabled, g_vhsRenderer);
+        configurationChanged |= resetChanged(crtEnabled, renderedCrtEnabled, g_crtRenderer);
+        if (configurationChanged) {
+            g_pipelineFailed = false;
         }
 
-        auto const usesSharedCapture = selectedMode == AntiAliasingMode::Fxaa || casEnabled ||
-            grayscaleEnabled || pixelateEnabled || ditheringEnabled || vhsEnabled || crtEnabled;
-        if (!usesSharedCapture) {
-            g_captureTexture.reset();
-        }
         if (g_pipelineFailed) {
             CCEGLView::swapBuffers();
             return;
@@ -222,121 +213,141 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
         auto const hasEffects = selectedMode != AntiAliasingMode::Off || casEnabled || bloomEnabled ||
             grayscaleEnabled || pixelateEnabled || ditheringEnabled || vhsEnabled || crtEnabled;
         if (!hasEffects) {
+            if (configurationChanged) {
+                g_framePipeline.reset();
+            }
             CCEGLView::swapBuffers();
             return;
         }
 
-        std::array<GLint, 4> viewport{};
-        glGetIntegerv(GL_VIEWPORT, viewport.data());
-        auto const width = static_cast<GLsizei>(viewport[2]);
-        auto const height = static_cast<GLsizei>(viewport[3]);
-        if (width <= 0 || height <= 0) {
-            CCEGLView::swapBuffers();
-            return;
-        }
+        auto const renderSucceeded = [&]() {
+            bv::render::GlStateGuard state;
+            auto const& viewport = state.viewport();
+            auto const width = static_cast<GLsizei>(viewport[2]);
+            auto const height = static_cast<GLsizei>(viewport[3]);
+            if (width <= 0 || height <= 0) {
+                return true;
+            }
 
-        bool renderSucceeded = true;
-        switch (selectedMode) {
-            case AntiAliasingMode::Fxaa:
-                renderSucceeded = g_postProcessRenderer.prepare(
-                    g_captureTexture, bv::shaders::kFxaaShader, width, height
+            bool prepared = g_framePipeline.prepare(width, height);
+            auto const pipelineFramebuffer = g_framePipeline.framebuffer();
+            switch (selectedMode) {
+                case AntiAliasingMode::Fxaa:
+                    prepared = prepared &&
+                        g_postProcessRenderer.prepare(bv::shaders::kFxaaShader, width, height);
+                    break;
+
+                case AntiAliasingMode::SmaaHigh:
+                    prepared = prepared &&
+                        g_smaaRenderer.prepare(
+                            bv::shaders::smaa::kSmaaHighShaderSet, width, height, pipelineFramebuffer
+                        );
+                    break;
+
+                case AntiAliasingMode::SmaaUltra:
+                    prepared = prepared &&
+                        g_smaaRenderer.prepare(
+                            bv::shaders::smaa::kSmaaUltraShaderSet, width, height, pipelineFramebuffer
+                        );
+                    break;
+
+                case AntiAliasingMode::Off: break;
+            }
+            if (prepared && casEnabled) {
+                prepared = g_casRenderer.prepare(bv::shaders::kCasShader, width, height);
+            }
+            if (prepared && bloomEnabled) {
+                prepared = g_bloomRenderer.prepare(width, height, pipelineFramebuffer);
+            }
+            if (prepared && grayscaleEnabled) {
+                prepared = g_grayscaleRenderer.prepare(bv::shaders::kGrayscaleShader, width, height);
+            }
+            if (prepared && pixelateEnabled) {
+                prepared = g_pixelateRenderer.prepare(bv::shaders::kPixelateShader, width, height);
+            }
+            if (prepared && ditheringEnabled) {
+                prepared = g_ditheringRenderer.prepare(bv::shaders::kDitheringShader, width, height);
+            }
+            if (prepared && vhsEnabled) {
+                prepared = g_vhsRenderer.prepare(bv::shaders::kVhsShader, width, height);
+            }
+            if (prepared && crtEnabled) {
+                prepared = g_crtRenderer.prepare(bv::shaders::kCrtShader, width, height);
+            }
+            if (!prepared || !g_framePipeline.capture(state.framebuffer(), viewport[0], viewport[1])) {
+                return false;
+            }
+
+            glDisable(GL_BLEND);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_STENCIL_TEST);
+            glDisable(GL_SCISSOR_TEST);
+            glDisable(GL_CULL_FACE);
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            g_framePipeline.bindQuad();
+
+            auto runPostProcess = [&](bv::render::PostProcessRenderer& renderer,
+                                      GLfloat scalar = 0.f) {
+                g_framePipeline.bindOutput();
+                if (!renderer.apply(g_framePipeline.inputTexture(), scalar)) {
+                    return false;
+                }
+                g_framePipeline.advance();
+                return true;
+            };
+            auto runSmaa = [&]() {
+                if (!g_smaaRenderer.apply(
+                        g_framePipeline.inputTexture(),
+                        g_framePipeline.outputTexture(),
+                        g_framePipeline.framebuffer()
+                    )) {
+                    return false;
+                }
+                g_framePipeline.advance();
+                return true;
+            };
+
+            bool applied = true;
+            switch (selectedMode) {
+                case AntiAliasingMode::Fxaa: applied = runPostProcess(g_postProcessRenderer); break;
+                case AntiAliasingMode::SmaaHigh: applied = runSmaa(); break;
+                case AntiAliasingMode::SmaaUltra: applied = runSmaa(); break;
+                case AntiAliasingMode::Off: break;
+            }
+            if (applied && casEnabled) {
+                applied =
+                    runPostProcess(g_casRenderer, g_casSharpness.load(std::memory_order_relaxed));
+            }
+            if (applied && bloomEnabled) {
+                applied = g_bloomRenderer.apply(
+                    g_framePipeline.inputTexture(),
+                    g_framePipeline.outputTexture(),
+                    g_framePipeline.framebuffer()
                 );
-                break;
-
-            case AntiAliasingMode::SmaaHigh:
-                renderSucceeded =
-                    g_smaaRenderer.prepare(bv::shaders::smaa::kSmaaHighShaderSet, width, height);
-                break;
-
-            case AntiAliasingMode::SmaaUltra:
-                renderSucceeded =
-                    g_smaaRenderer.prepare(bv::shaders::smaa::kSmaaUltraShaderSet, width, height);
-                break;
-
-            case AntiAliasingMode::Off: break;
-        }
-        if (renderSucceeded && casEnabled) {
-            renderSucceeded =
-                g_casRenderer.prepare(g_captureTexture, bv::shaders::kCasShader, width, height);
-        }
-        if (renderSucceeded && bloomEnabled) {
-            renderSucceeded = g_bloomRenderer.prepare(width, height);
-        }
-        if (renderSucceeded && grayscaleEnabled) {
-            renderSucceeded = g_grayscaleRenderer.prepare(
-                g_captureTexture, bv::shaders::kGrayscaleShader, width, height
-            );
-        }
-        if (renderSucceeded && pixelateEnabled) {
-            renderSucceeded = g_pixelateRenderer.prepare(
-                g_captureTexture, bv::shaders::kPixelateShader, width, height
-            );
-        }
-        if (renderSucceeded && ditheringEnabled) {
-            renderSucceeded = g_ditheringRenderer.prepare(
-                g_captureTexture, bv::shaders::kDitheringShader, width, height
-            );
-        }
-        if (renderSucceeded && vhsEnabled) {
-            renderSucceeded =
-                g_vhsRenderer.prepare(g_captureTexture, bv::shaders::kVhsShader, width, height);
-        }
-        if (renderSucceeded && crtEnabled) {
-            renderSucceeded =
-                g_crtRenderer.prepare(g_captureTexture, bv::shaders::kCrtShader, width, height);
-        }
-        if (!renderSucceeded) {
-            disableRenderPipeline();
-            CCEGLView::swapBuffers();
-            return;
-        }
-
-        switch (selectedMode) {
-            case AntiAliasingMode::Fxaa:
-                renderSucceeded =
-                    g_postProcessRenderer.apply(g_captureTexture, bv::shaders::kFxaaShader);
-                break;
-
-            case AntiAliasingMode::SmaaHigh:
-                renderSucceeded = g_smaaRenderer.apply(bv::shaders::smaa::kSmaaHighShaderSet);
-                break;
-
-            case AntiAliasingMode::SmaaUltra:
-                renderSucceeded = g_smaaRenderer.apply(bv::shaders::smaa::kSmaaUltraShaderSet);
-                break;
-
-            case AntiAliasingMode::Off: break;
-        }
-
-        if (renderSucceeded && casEnabled) {
-            renderSucceeded = g_casRenderer.apply(
-                g_captureTexture, bv::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
-            );
-        }
-        if (renderSucceeded && bloomEnabled) {
-            renderSucceeded = g_bloomRenderer.apply();
-        }
-        if (renderSucceeded && grayscaleEnabled) {
-            renderSucceeded =
-                g_grayscaleRenderer.apply(g_captureTexture, bv::shaders::kGrayscaleShader);
-        }
-        if (renderSucceeded && pixelateEnabled) {
-            renderSucceeded =
-                g_pixelateRenderer.apply(g_captureTexture, bv::shaders::kPixelateShader);
-        }
-        if (renderSucceeded && ditheringEnabled) {
-            renderSucceeded =
-                g_ditheringRenderer.apply(g_captureTexture, bv::shaders::kDitheringShader);
-        }
-        if (renderSucceeded && vhsEnabled) {
-            static auto const clockStart = std::chrono::steady_clock::now();
-            auto const elapsed =
-                std::chrono::duration<GLfloat>(std::chrono::steady_clock::now() - clockStart).count();
-            renderSucceeded = g_vhsRenderer.apply(g_captureTexture, bv::shaders::kVhsShader, elapsed);
-        }
-        if (renderSucceeded && crtEnabled) {
-            renderSucceeded = g_crtRenderer.apply(g_captureTexture, bv::shaders::kCrtShader);
-        }
+                if (applied) {
+                    g_framePipeline.advance();
+                }
+            }
+            if (applied && grayscaleEnabled) {
+                applied = runPostProcess(g_grayscaleRenderer);
+            }
+            if (applied && pixelateEnabled) {
+                applied = runPostProcess(g_pixelateRenderer);
+            }
+            if (applied && ditheringEnabled) {
+                applied = runPostProcess(g_ditheringRenderer);
+            }
+            if (applied && vhsEnabled) {
+                static auto const clockStart = std::chrono::steady_clock::now();
+                auto const elapsed =
+                    std::chrono::duration<GLfloat>(std::chrono::steady_clock::now() - clockStart).count();
+                applied = runPostProcess(g_vhsRenderer, elapsed);
+            }
+            if (applied && crtEnabled) {
+                applied = runPostProcess(g_crtRenderer);
+            }
+            return applied && g_framePipeline.present(state.framebuffer(), viewport);
+        }();
         if (!renderSucceeded) {
             disableRenderPipeline();
         }

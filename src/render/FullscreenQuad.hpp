@@ -18,7 +18,7 @@ namespace bv::render {
 
         bool initialize(std::string_view label);
         void bind() const;
-        void draw() const;
+        static void draw();
         void reset();
 
     private:

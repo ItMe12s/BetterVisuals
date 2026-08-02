@@ -1,7 +1,5 @@
 #pragma once
 
-#include "FullscreenQuad.hpp"
-
 #include <Geode/cocos/platform/CCGL.h>
 #include <array>
 
@@ -13,8 +11,8 @@ namespace bv::render {
         BloomRenderer(BloomRenderer const&) = delete;
         BloomRenderer& operator=(BloomRenderer const&) = delete;
 
-        bool prepare(GLsizei width, GLsizei height);
-        bool apply();
+        bool prepare(GLsizei width, GLsizei height, GLuint framebuffer);
+        bool apply(GLuint inputTexture, GLuint outputTexture, GLuint framebuffer);
         void reset();
 
     private:
@@ -22,24 +20,19 @@ namespace bv::render {
 
         struct Program {
             GLuint handle = 0;
-            std::array<GLint, 2> textures = {-1, -1};
             GLint offset = -1;
         };
 
         bool initialize();
-        bool resizeTextures(GLsizei width, GLsizei height);
-        bool validateFramebuffer(GLuint texture);
-        void bindIntermediateFramebuffer();
-        void attachIntermediateTexture(GLuint texture);
+        bool resizeTextures(GLsizei width, GLsizei height, GLuint framebuffer);
+        bool validateFramebuffer(GLuint framebuffer, GLuint texture);
+        void attachTexture(GLuint framebuffer, GLuint texture);
         void destroyResources();
 
         std::array<Program, 3> m_programs = {};
-        GLuint m_sourceTexture = 0;
         GLuint m_prefilterTexture = 0;
         GLuint m_horizontalTexture = 0;
         GLuint m_verticalTexture = 0;
-        GLuint m_framebuffer = 0;
-        FullscreenQuad m_quad;
         GLsizei m_width = 0;
         GLsizei m_height = 0;
         GLsizei m_halfWidth = 0;

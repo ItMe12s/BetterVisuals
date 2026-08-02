@@ -73,7 +73,7 @@ namespace bv::render {
         );
     }
 
-    void FullscreenQuad::draw() const {
+    void FullscreenQuad::draw() {
         glDrawArrays(GL_TRIANGLE_STRIP, 0, static_cast<GLsizei>(kVertices.size()));
     }
 

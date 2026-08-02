@@ -1,11 +1,12 @@
 #include "SmaaRenderer.hpp"
 
 #include "../shaders/aa/SmaaLookupTextures.hpp"
-#include "GlStateGuard.hpp"
+#include "FullscreenQuad.hpp"
 #include "ShaderProgram.hpp"
 
 #include <Geode/Geode.hpp>
 #include <array>
+#include <cassert>
 #include <cstddef>
 
 using namespace geode::prelude;
@@ -45,14 +46,15 @@ namespace bv::render {
             m_width == width && m_height == height;
     }
 
-    bool SmaaRenderer::prepare(shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height) {
+    bool SmaaRenderer::prepare(
+        shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height, GLuint framebuffer
+    ) {
         if (isReady(shaders, width, height)) {
             return true;
         }
 
-        GlStateGuard state{GlStateProfile::Multipass};
         glActiveTexture(GL_TEXTURE0);
-        return initialize(shaders) && resizeTextures(width, height);
+        return initialize(shaders) && resizeTextures(width, height, framebuffer);
     }
 
     bool SmaaRenderer::initialize(shaders::smaa::ShaderSet const& shaders) {
@@ -98,15 +100,14 @@ namespace bv::render {
             }
         }
 
-        m_programs[0].textures[0] = glGetUniformLocation(m_programs[0].handle, "u_colorTexture");
-        m_programs[1].textures[0] = glGetUniformLocation(m_programs[1].handle, "u_edgesTexture");
-        m_programs[1].textures[1] = glGetUniformLocation(m_programs[1].handle, "u_areaTexture");
-        m_programs[1].textures[2] = glGetUniformLocation(m_programs[1].handle, "u_searchTexture");
-        m_programs[2].textures[0] = glGetUniformLocation(m_programs[2].handle, "u_colorTexture");
-        m_programs[2].textures[1] = glGetUniformLocation(m_programs[2].handle, "u_blendTexture");
-        if (m_programs[0].textures[0] < 0 || m_programs[1].textures[0] < 0 ||
-            m_programs[1].textures[1] < 0 || m_programs[1].textures[2] < 0 ||
-            m_programs[2].textures[0] < 0 || m_programs[2].textures[1] < 0) {
+        auto const colorTexture = glGetUniformLocation(m_programs[0].handle, "u_colorTexture");
+        auto const edgesTexture = glGetUniformLocation(m_programs[1].handle, "u_edgesTexture");
+        auto const areaTexture = glGetUniformLocation(m_programs[1].handle, "u_areaTexture");
+        auto const searchTexture = glGetUniformLocation(m_programs[1].handle, "u_searchTexture");
+        auto const neighborhoodColor = glGetUniformLocation(m_programs[2].handle, "u_colorTexture");
+        auto const blendTexture = glGetUniformLocation(m_programs[2].handle, "u_blendTexture");
+        if (colorTexture < 0 || edgesTexture < 0 || areaTexture < 0 || searchTexture < 0 ||
+            neighborhoodColor < 0 || blendTexture < 0) {
             log::error("SMAA shader is missing required texture uniforms");
             destroyResources();
             m_failed = true;
@@ -114,41 +115,32 @@ namespace bv::render {
         }
 
         glUseProgram(m_programs[0].handle);
-        glUniform1i(m_programs[0].textures[0], 0);
+        glUniform1i(colorTexture, 0);
         glUseProgram(m_programs[1].handle);
-        glUniform1i(m_programs[1].textures[0], 0);
-        glUniform1i(m_programs[1].textures[1], 1);
-        glUniform1i(m_programs[1].textures[2], 2);
+        glUniform1i(edgesTexture, 0);
+        glUniform1i(areaTexture, 1);
+        glUniform1i(searchTexture, 2);
         glUseProgram(m_programs[2].handle);
-        glUniform1i(m_programs[2].textures[0], 0);
-        glUniform1i(m_programs[2].textures[1], 1);
+        glUniform1i(neighborhoodColor, 0);
+        glUniform1i(blendTexture, 1);
 
-        std::array<GLuint*, 5> textureHandles = {
-            &m_sourceTexture,
+        std::array<GLuint*, 4> textureHandles = {
             &m_edgeTexture,
             &m_weightTexture,
             &m_areaTexture,
             &m_searchTexture,
         };
-        std::array<GLuint, 5> textures = {};
+        std::array<GLuint, 4> textures = {};
         glGenTextures(static_cast<GLsizei>(textures.size()), textures.data());
         for (std::size_t index = 0; index < textures.size(); ++index) {
             *textureHandles[index] = textures[index];
         }
-        glGenFramebuffers(1, &m_framebuffer);
-        if (m_sourceTexture == 0 || m_edgeTexture == 0 || m_weightTexture == 0 ||
-            m_areaTexture == 0 || m_searchTexture == 0 || m_framebuffer == 0) {
+        if (m_edgeTexture == 0 || m_weightTexture == 0 || m_areaTexture == 0 || m_searchTexture == 0) {
             log::error("Unable to allocate SMAA OpenGL objects");
             destroyResources();
             m_failed = true;
             return false;
         }
-        if (!m_quad.initialize("SMAA")) {
-            destroyResources();
-            m_failed = true;
-            return false;
-        }
-
         for (auto texture : textures) {
             configureTexture(texture);
         }
@@ -184,12 +176,12 @@ namespace bv::render {
         return true;
     }
 
-    bool SmaaRenderer::resizeTextures(GLsizei width, GLsizei height) {
+    bool SmaaRenderer::resizeTextures(GLsizei width, GLsizei height, GLuint framebuffer) {
         if (width == m_width && height == m_height) {
             return true;
         }
 
-        for (auto texture : {m_sourceTexture, m_edgeTexture, m_weightTexture}) {
+        for (auto texture : {m_edgeTexture, m_weightTexture}) {
             glBindTexture(GL_TEXTURE_2D, texture);
             if (!uploadTexture(GL_RGBA, width, height, GL_RGBA, nullptr)) {
                 log::error("Unable to allocate a {}x{} SMAA framebuffer texture", width, height);
@@ -199,7 +191,8 @@ namespace bv::render {
             }
         }
 
-        if (!validateFramebuffer(m_edgeTexture) || !validateFramebuffer(m_weightTexture)) {
+        if (!validateFramebuffer(framebuffer, m_edgeTexture) ||
+            !validateFramebuffer(framebuffer, m_weightTexture)) {
             log::error("Unable to create complete SMAA framebuffers");
             destroyResources();
             m_failed = true;
@@ -222,74 +215,48 @@ namespace bv::render {
         return true;
     }
 
-    bool SmaaRenderer::validateFramebuffer(GLuint texture) {
-        bindIntermediateFramebuffer();
-        attachIntermediateTexture(texture);
+    bool SmaaRenderer::validateFramebuffer(GLuint framebuffer, GLuint texture) {
+        attachTexture(framebuffer, texture);
         return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     }
 
-    void SmaaRenderer::bindIntermediateFramebuffer() {
-        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
-    }
-
-    void SmaaRenderer::attachIntermediateTexture(GLuint texture) {
+    void SmaaRenderer::attachTexture(GLuint framebuffer, GLuint texture) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     }
 
-    bool SmaaRenderer::apply(shaders::smaa::ShaderSet const& shaders) {
-        if (m_failed && m_shaders == &shaders) {
+    bool SmaaRenderer::apply(GLuint inputTexture, GLuint outputTexture, GLuint framebuffer) {
+        if (m_failed || m_programs[0].handle == 0 || inputTexture == 0 || outputTexture == 0 ||
+            framebuffer == 0) {
             return false;
         }
+        assert(inputTexture != outputTexture);
 
-        GlStateGuard state{GlStateProfile::Multipass};
         glActiveTexture(GL_TEXTURE0);
-        auto const& viewport = state.viewport();
-        auto const width = static_cast<GLsizei>(viewport[2]);
-        auto const height = static_cast<GLsizei>(viewport[3]);
-        if (width <= 0 || height <= 0) {
-            return true;
-        }
-        if (!initialize(shaders) || !resizeTextures(width, height)) {
-            return false;
-        }
-
-        state.bindOriginalFramebuffer();
-        glBindTexture(GL_TEXTURE_2D, m_sourceTexture);
-        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, viewport[0], viewport[1], width, height);
-
-        glDisable(GL_BLEND);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_SCISSOR_TEST);
-        glDisable(GL_CULL_FACE);
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glClearColor(0.f, 0.f, 0.f, 0.f);
-        glViewport(0, 0, width, height);
-        m_quad.bind();
-
-        bindIntermediateFramebuffer();
-        attachIntermediateTexture(m_edgeTexture);
+        glViewport(0, 0, m_width, m_height);
+        attachTexture(framebuffer, m_edgeTexture);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(m_programs[0].handle);
-        m_quad.draw();
+        glBindTexture(GL_TEXTURE_2D, inputTexture);
+        FullscreenQuad::draw();
 
-        attachIntermediateTexture(m_weightTexture);
+        attachTexture(framebuffer, m_weightTexture);
         glUseProgram(m_programs[1].handle);
         glBindTexture(GL_TEXTURE_2D, m_edgeTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_areaTexture);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, m_searchTexture);
-        m_quad.draw();
+        FullscreenQuad::draw();
 
-        state.bindOriginalFramebuffer();
-        glViewport(viewport[0], viewport[1], width, height);
+        attachTexture(framebuffer, outputTexture);
         glUseProgram(m_programs[2].handle);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_sourceTexture);
+        glBindTexture(GL_TEXTURE_2D, inputTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_weightTexture);
-        m_quad.draw();
+        FullscreenQuad::draw();
         return true;
     }
 
@@ -300,21 +267,13 @@ namespace bv::render {
     }
 
     void SmaaRenderer::destroyResources() {
-        m_quad.reset();
-        if (m_framebuffer != 0) {
-            glDeleteFramebuffers(1, &m_framebuffer);
-            m_framebuffer = 0;
-        }
-
-        std::array<GLuint, 5> const textures = {
-            m_sourceTexture,
+        std::array<GLuint, 4> const textures = {
             m_edgeTexture,
             m_weightTexture,
             m_areaTexture,
             m_searchTexture,
         };
         glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
-        m_sourceTexture = 0;
         m_edgeTexture = 0;
         m_weightTexture = 0;
         m_areaTexture = 0;

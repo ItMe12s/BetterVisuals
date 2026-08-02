@@ -5,11 +5,6 @@
 
 namespace bv::render {
 
-    enum class GlStateProfile {
-        PostProcess,
-        Multipass,
-    };
-
     struct VertexAttributeState {
         GLint enabled = GL_FALSE;
         GLint buffer = 0;
@@ -23,7 +18,6 @@ namespace bv::render {
     };
 
     struct GlState {
-        GlStateProfile profile = GlStateProfile::PostProcess;
         GLint program = 0;
         GLint activeTexture = GL_TEXTURE0;
         std::array<GLint, 3> textures2D = {};
@@ -42,19 +36,16 @@ namespace bv::render {
         bool operator==(GlState const&) const = default;
     };
 
-    GlState captureGlState(GlStateProfile profile);
-    void restoreGlState(GlState const& state);
-
     class GlStateGuard final {
     public:
-        explicit GlStateGuard(GlStateProfile profile);
+        GlStateGuard();
         ~GlStateGuard();
 
         GlStateGuard(GlStateGuard const&) = delete;
         GlStateGuard& operator=(GlStateGuard const&) = delete;
 
         std::array<GLint, 4> const& viewport() const;
-        void bindOriginalFramebuffer() const;
+        GLuint framebuffer() const;
 
     private:
         GlState m_state;
