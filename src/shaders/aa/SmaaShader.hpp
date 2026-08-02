@@ -19,12 +19,7 @@ namespace bv::shaders::smaa {
         std::array<ProgramSource, 3> programs;
     };
 
+    extern ShaderSet const kSmaaHighShaderSet;
+    extern ShaderSet const kSmaaUltraShaderSet;
+
 } // namespace bv::shaders::smaa
-
-namespace bv::shaders {
-
-    using SmaaShaderSet = smaa::ShaderSet;
-    extern SmaaShaderSet const kSmaaHighShaderSet;
-    extern SmaaShaderSet const kSmaaUltraShaderSet;
-
-} // namespace bv::shaders

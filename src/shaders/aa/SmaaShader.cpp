@@ -733,7 +733,7 @@ void main() {
         {"SMAA neighborhood blending", kNeighborhoodVertexMain, kNeighborhoodFragmentMain},
     }};
 
-    constexpr ShaderSet kSmaaHighShaderSet{
+    ShaderSet const kSmaaHighShaderSet{
         kHighCommonSource,
         kVertexStageSource,
         kFragmentStageSource,
@@ -741,7 +741,7 @@ void main() {
         kPrograms,
     };
 
-    constexpr ShaderSet kSmaaUltraShaderSet{
+    ShaderSet const kSmaaUltraShaderSet{
         kUltraCommonSource,
         kVertexStageSource,
         kFragmentStageSource,
@@ -750,8 +750,3 @@ void main() {
     };
 
 } // namespace bv::shaders::smaa
-
-namespace bv::shaders {
-    SmaaShaderSet const kSmaaHighShaderSet = smaa::kSmaaHighShaderSet;
-    SmaaShaderSet const kSmaaUltraShaderSet = smaa::kSmaaUltraShaderSet;
-} // namespace bv::shaders

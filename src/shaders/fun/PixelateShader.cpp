@@ -1,6 +1,5 @@
-#include "PixelateShader.hpp"
-
 #include "../../render/PostProcessRenderer.hpp"
+#include "../PostProcessShaders.hpp"
 
 /*
  * Based on the texture-coordinate snapping from:
@@ -8,17 +7,6 @@
  */
 
 namespace bv::shaders::pixelate {
-
-    constexpr char kVertexSource[] = R"glsl(
-attribute vec2 a_position;
-attribute vec2 a_texCoord;
-varying vec2 v_texCoord;
-
-void main() {
-    v_texCoord = a_texCoord;
-    gl_Position = vec4(a_position, 0.0, 1.0);
-}
-)glsl";
 
     constexpr char kFragmentSource[] = R"glsl(
 uniform sampler2D u_texture;
@@ -47,7 +35,7 @@ namespace bv::shaders {
 
     render::PostProcessShader const kPixelateShader{
         "Pixelate",
-        pixelate::kVertexSource,
+        kFullscreenVertexSource,
         pixelate::kFragmentSource,
     };
 

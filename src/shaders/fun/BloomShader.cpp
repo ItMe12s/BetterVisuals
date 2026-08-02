@@ -1,22 +1,13 @@
 #include "BloomShader.hpp"
 
+#include "../PostProcessShaders.hpp"
+
 /*
  * Based on the bloom kernel from:
  * https://github.com/kiwipxl/GLSL-shaders/blob/master/bloom.glsl
  */
 
 namespace bv::shaders::bloom {
-
-    constexpr char kVertexSource[] = R"glsl(
-attribute vec2 a_position;
-attribute vec2 a_texCoord;
-varying vec2 v_texCoord;
-
-void main() {
-    v_texCoord = a_texCoord;
-    gl_Position = vec4(a_position, 0.0, 1.0);
-}
-)glsl";
 
     constexpr char kPrefilterSource[] = R"glsl(
 uniform sampler2D u_texture;
@@ -77,7 +68,7 @@ void main() {
 namespace bv::shaders {
 
     BloomShaderSet const kBloomShaderSet{
-        bloom::kVertexSource,
+        kFullscreenVertexSource,
         bloom::kPrefilterSource,
         bloom::kBlurSource,
         bloom::kCompositeSource,

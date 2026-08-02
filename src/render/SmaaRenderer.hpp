@@ -14,12 +14,12 @@ namespace bv::render {
         SmaaRenderer(SmaaRenderer const&) = delete;
         SmaaRenderer& operator=(SmaaRenderer const&) = delete;
 
-        bool prepare(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height);
-        bool apply(shaders::SmaaShaderSet const& shaders);
+        bool prepare(shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height);
+        bool apply(shaders::smaa::ShaderSet const& shaders);
         void reset();
 
     private:
-        bool isReady(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height) const;
+        bool isReady(shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height) const;
 
         struct Program {
             GLuint handle = 0;
@@ -27,14 +27,14 @@ namespace bv::render {
             std::array<GLint, 3> textures = {-1, -1, -1};
         };
 
-        bool initialize(shaders::SmaaShaderSet const& shaders);
+        bool initialize(shaders::smaa::ShaderSet const& shaders);
         bool resizeTextures(GLsizei width, GLsizei height);
         bool validateFramebuffer(GLuint texture);
         void bindIntermediateFramebuffer();
         void attachIntermediateTexture(GLuint texture);
         void destroyResources();
 
-        shaders::SmaaShaderSet const* m_shaders = nullptr;
+        shaders::smaa::ShaderSet const* m_shaders = nullptr;
         std::array<Program, 3> m_programs = {};
         GLuint m_sourceTexture = 0;
         GLuint m_edgeTexture = 0;

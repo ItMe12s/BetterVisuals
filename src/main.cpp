@@ -1,14 +1,8 @@
 #include "render/BloomRenderer.hpp"
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
-#include "shaders/aa/FxaaShader.hpp"
+#include "shaders/PostProcessShaders.hpp"
 #include "shaders/aa/SmaaShader.hpp"
-#include "shaders/fun/CrtShader.hpp"
-#include "shaders/fun/DitheringShader.hpp"
-#include "shaders/fun/GrayscaleShader.hpp"
-#include "shaders/fun/PixelateShader.hpp"
-#include "shaders/fun/VhsShader.hpp"
-#include "shaders/sharpen/CasShader.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
@@ -251,12 +245,12 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
 
             case AntiAliasingMode::SmaaHigh:
                 renderSucceeded =
-                    g_smaaRenderer.prepare(bv::shaders::kSmaaHighShaderSet, width, height);
+                    g_smaaRenderer.prepare(bv::shaders::smaa::kSmaaHighShaderSet, width, height);
                 break;
 
             case AntiAliasingMode::SmaaUltra:
                 renderSucceeded =
-                    g_smaaRenderer.prepare(bv::shaders::kSmaaUltraShaderSet, width, height);
+                    g_smaaRenderer.prepare(bv::shaders::smaa::kSmaaUltraShaderSet, width, height);
                 break;
 
             case AntiAliasingMode::Off: break;
@@ -304,11 +298,11 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
                 break;
 
             case AntiAliasingMode::SmaaHigh:
-                renderSucceeded = g_smaaRenderer.apply(bv::shaders::kSmaaHighShaderSet);
+                renderSucceeded = g_smaaRenderer.apply(bv::shaders::smaa::kSmaaHighShaderSet);
                 break;
 
             case AntiAliasingMode::SmaaUltra:
-                renderSucceeded = g_smaaRenderer.apply(bv::shaders::kSmaaUltraShaderSet);
+                renderSucceeded = g_smaaRenderer.apply(bv::shaders::smaa::kSmaaUltraShaderSet);
                 break;
 
             case AntiAliasingMode::Off: break;

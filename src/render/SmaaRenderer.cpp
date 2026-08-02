@@ -38,12 +38,14 @@ namespace {
 
 namespace bv::render {
 
-    bool SmaaRenderer::isReady(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height) const {
+    bool SmaaRenderer::isReady(
+        shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height
+    ) const {
         return !m_failed && m_shaders == &shaders && m_programs[0].handle != 0 &&
             m_width == width && m_height == height;
     }
 
-    bool SmaaRenderer::prepare(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height) {
+    bool SmaaRenderer::prepare(shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height) {
         if (isReady(shaders, width, height)) {
             return true;
         }
@@ -53,7 +55,7 @@ namespace bv::render {
         return initialize(shaders) && resizeTextures(width, height);
     }
 
-    bool SmaaRenderer::initialize(shaders::SmaaShaderSet const& shaders) {
+    bool SmaaRenderer::initialize(shaders::smaa::ShaderSet const& shaders) {
         if (m_shaders != &shaders) {
             destroyResources();
             m_shaders = &shaders;
@@ -234,7 +236,7 @@ namespace bv::render {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     }
 
-    bool SmaaRenderer::apply(shaders::SmaaShaderSet const& shaders) {
+    bool SmaaRenderer::apply(shaders::smaa::ShaderSet const& shaders) {
         if (m_failed && m_shaders == &shaders) {
             return false;
         }
