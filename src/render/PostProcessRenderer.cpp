@@ -33,7 +33,10 @@ namespace aa::render {
 
         m_textureUniform = glGetUniformLocation(m_program, "u_texture");
         m_invResolutionUniform = glGetUniformLocation(m_program, "u_invResolution");
-        if (m_textureUniform < 0 || m_invResolutionUniform < 0) {
+        m_scalarUniform =
+            shader.scalarUniform ? glGetUniformLocation(m_program, shader.scalarUniform) : -1;
+        if (m_textureUniform < 0 || m_invResolutionUniform < 0 ||
+            (shader.scalarUniform && m_scalarUniform < 0)) {
             log::error("{} shader is missing required uniforms", shader.name);
             destroyResources();
             m_failed = true;
@@ -93,7 +96,7 @@ namespace aa::render {
         return true;
     }
 
-    void PostProcessRenderer::apply(PostProcessShader const& shader) {
+    void PostProcessRenderer::apply(PostProcessShader const& shader, GLfloat scalar) {
         if (m_failed && m_shader == &shader) {
             return;
         }
@@ -114,6 +117,9 @@ namespace aa::render {
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, viewport[0], viewport[1], width, height);
 
         glUseProgram(m_program);
+        if (m_scalarUniform >= 0) {
+            glUniform1f(m_scalarUniform, scalar);
+        }
 
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
@@ -148,6 +154,7 @@ namespace aa::render {
 
         m_textureUniform = -1;
         m_invResolutionUniform = -1;
+        m_scalarUniform = -1;
         m_width = 0;
         m_height = 0;
     }

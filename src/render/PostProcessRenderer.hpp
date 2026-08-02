@@ -11,6 +11,7 @@ namespace aa::render {
         std::string_view name;
         std::string_view vertexSource;
         std::string_view fragmentSource;
+        char const* scalarUniform = nullptr;
     };
 
     class PostProcessRenderer final {
@@ -19,7 +20,7 @@ namespace aa::render {
         PostProcessRenderer(PostProcessRenderer const&) = delete;
         PostProcessRenderer& operator=(PostProcessRenderer const&) = delete;
 
-        void apply(PostProcessShader const& shader);
+        void apply(PostProcessShader const& shader, GLfloat scalar = 0.f);
         void reset();
 
     private:
@@ -33,6 +34,7 @@ namespace aa::render {
         FullscreenQuad m_quad;
         GLint m_textureUniform = -1;
         GLint m_invResolutionUniform = -1;
+        GLint m_scalarUniform = -1;
         GLsizei m_width = 0;
         GLsizei m_height = 0;
         bool m_failed = false;

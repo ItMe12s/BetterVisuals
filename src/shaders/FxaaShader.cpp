@@ -2,13 +2,15 @@
 
 #include "../render/PostProcessRenderer.hpp"
 
-// References used:
-// NVIDIA FXAA 3.x whitepaper
-// https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
-// Three.js edge search and subpixel blending
-// https://github.com/mrdoob/three.js/blob/dev/examples/jsm/shaders/FXAAShader.js
-// Libretro GLSL 1.20 FXAA
-// https://github.com/libretro/glsl-shaders/blob/master/anti-aliasing/shaders/fxaa.glsl
+/*
+ * References used:
+ * NVIDIA FXAA 3.x whitepaper
+ * https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
+ * Three.js edge search and subpixel blending
+ * https://github.com/mrdoob/three.js/blob/dev/examples/jsm/shaders/FXAAShader.js
+ * Libretro GLSL 1.20 FXAA
+ * https://github.com/libretro/glsl-shaders/blob/master/anti-aliasing/shaders/fxaa.glsl
+ */
 
 namespace aa::shaders::fxaa {
 

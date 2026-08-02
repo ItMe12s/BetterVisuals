@@ -57,7 +57,7 @@ uniform vec4 u_metrics;
 )glsl";
 
     constexpr char kAlgorithmSource[] = R"glsl(
-/**
+/*
  * Copyright (C) 2013 Jorge Jimenez (jorge@iryoku.com)
  * Copyright (C) 2013 Jose I. Echevarria (joseignacioechevarria@gmail.com)
  * Copyright (C) 2013 Belen Masia (bmasia@unizar.es)
@@ -95,12 +95,12 @@ uniform vec4 u_metrics;
 #define SMAA_CORNER_ROUNDING_NORM (float(SMAA_CORNER_ROUNDING) / 100.0)
 
 #if SMAA_INCLUDE_VS
-//-----------------------------------------------------------------------------
-// Vertex Shaders
-
-/**
- * Edge Detection Vertex Shader
+/*
+ * -----------------------------------------------------------------------------
+ * Vertex Shaders
  */
+
+// Edge Detection Vertex Shader
 void SMAAEdgeDetectionVS(vec2 texcoord,
                          out vec4 offset[3]) {
     offset[0] = mad(SMAA_RT_METRICS.xyxy, vec4(-1.0, 0.0, 0.0, -1.0), texcoord.xyxy);
@@ -108,9 +108,7 @@ void SMAAEdgeDetectionVS(vec2 texcoord,
     offset[2] = mad(SMAA_RT_METRICS.xyxy, vec4(-2.0, 0.0, 0.0, -2.0), texcoord.xyxy);
 }
 
-/**
- * Blend Weight Calculation Vertex Shader
- */
+// Blend Weight Calculation Vertex Shader
 void SMAABlendingWeightCalculationVS(vec2 texcoord,
                                      out vec2 pixcoord,
                                      out vec4 offset[3]) {
@@ -126,9 +124,7 @@ void SMAABlendingWeightCalculationVS(vec2 texcoord,
                     vec4(offset[0].xz, offset[1].yw));
 }
 
-/**
- * Neighborhood Blending Vertex Shader
- */
+// Neighborhood Blending Vertex Shader
 void SMAANeighborhoodBlendingVS(vec2 texcoord,
                                 out vec4 offset) {
     offset = mad(SMAA_RT_METRICS.xyxy, vec4( 1.0, 0.0, 0.0,  1.0), texcoord.xyxy);
@@ -146,10 +142,12 @@ void SMAAMovc(bvec2 cond, inout vec2 variable, vec2 value) {
     if (cond.y) variable.y = value.y;
 }
 
-//-----------------------------------------------------------------------------
-// Edge Detection Pixel Shaders (First Pass)
+/*
+ * -----------------------------------------------------------------------------
+ * Edge Detection Pixel Shaders (First Pass)
+ */
 
-/**
+/*
  * Color Edge Detection
  *
  * IMPORTANT NOTICE: color edge detection requires gamma-corrected colors, and
@@ -211,26 +209,28 @@ vec2 SMAAColorEdgeDetectionPS(vec2 texcoord,
     return edges;
 }
 
-//-----------------------------------------------------------------------------
-// Diagonal Search Functions
-
-/**
- * Allows to decode two binary values from a bilinear-filtered access.
+/*
+ * -----------------------------------------------------------------------------
+ * Diagonal Search Functions
  */
+
+// Allows to decode two binary values from a bilinear-filtered access.
 vec2 SMAADecodeDiagBilinearAccess(vec2 e) {
-    // Bilinear access for fetching 'e' have a 0.25 offset, and we are
-    // interested in the R and G edges:
-    //
-    // +---G---+-------+
-    // |   x o R   x   |
-    // +-------+-------+
-    //
-    // Then, if one of these edge is enabled:
-    //   Red:   (0.75 * X + 0.25 * 1) => 0.25 or 1.0
-    //   Green: (0.75 * 1 + 0.25 * X) => 0.75 or 1.0
-    //
-    // This function will unpack the values (mad + mul + round):
-    // wolframalpha.com: round(x * abs(5 * x - 5 * 0.75)) plot 0 to 1
+    /*
+     * Bilinear access for fetching 'e' have a 0.25 offset, and we are
+     * interested in the R and G edges:
+     *
+     * +---G---+-------+
+     * |   x o R   x   |
+     * +-------+-------+
+     *
+     * Then, if one of these edge is enabled:
+     *   Red:   (0.75 * X + 0.25 * 1) => 0.25 or 1.0
+     *   Green: (0.75 * 1 + 0.25 * X) => 0.75 or 1.0
+     *
+     * This function will unpack the values (mad + mul + round):
+     * wolframalpha.com: round(x * abs(5 * x - 5 * 0.75)) plot 0 to 1
+     */
     e.r = e.r * abs(5.0 * e.r - 5.0 * 0.75);
     return smaaRound(e);
 }
@@ -240,9 +240,7 @@ vec4 SMAADecodeDiagBilinearAccess(vec4 e) {
     return smaaRound(e);
 }
 
-/**
- * These functions allows to perform diagonal pattern searches.
- */
+// These functions allows to perform diagonal pattern searches.
 vec2 SMAASearchDiag1(sampler2D edgesTex, vec2 texcoord, vec2 dir, out vec2 e) {
     vec4 coord = vec4(texcoord, -1.0, 1.0);
     vec3 t = vec3(SMAA_RT_METRICS.xy, 1.0);
@@ -263,8 +261,10 @@ vec2 SMAASearchDiag2(sampler2D edgesTex, vec2 texcoord, vec2 dir, out vec2 e) {
         if (!(coord.z < float(SMAA_MAX_SEARCH_STEPS_DIAG - 1) && coord.w > 0.9)) break;
         coord.xyz = mad(t, vec3(dir, 1.0), coord.xyz);
 
-        // @SearchDiag2Optimization
-        // Fetch both edges at once using bilinear filtering:
+        /*
+         * @SearchDiag2Optimization
+         * Fetch both edges at once using bilinear filtering:
+         */
         e = texture2D(edgesTex, coord.xy).rg;
         e = SMAADecodeDiagBilinearAccess(e);
 
@@ -273,7 +273,7 @@ vec2 SMAASearchDiag2(sampler2D edgesTex, vec2 texcoord, vec2 dir, out vec2 e) {
     return coord.zw;
 }
 
-/** 
+/*
  * Similar to SMAAArea, this calculates the area corresponding to a certain
  * diagonal distance and crossing edges 'e'.
  */
@@ -293,9 +293,7 @@ vec2 SMAAAreaDiag(sampler2D areaTex, vec2 dist, vec2 e, float offset) {
     return texture2D(areaTex, texcoord).ra;
 }
 
-/**
- * This searches for diagonal patterns and returns the corresponding weights.
- */
+// This searches for diagonal patterns and returns the corresponding weights.
 vec2 SMAACalculateDiagWeights(sampler2D edgesTex, sampler2D areaTex, vec2 texcoord, vec2 e, vec4 subsampleIndices) {
     vec2 weights = vec2(0.0, 0.0);
 
@@ -353,18 +351,22 @@ vec2 SMAACalculateDiagWeights(sampler2D edgesTex, sampler2D areaTex, vec2 texcoo
 
     return weights;
 }
-//-----------------------------------------------------------------------------
-// Horizontal/Vertical Search Functions
+/*
+ * -----------------------------------------------------------------------------
+ * Horizontal/Vertical Search Functions
+ */
 
-/**
+/*
  * This allows to determine how much length should we add in the last step
  * of the searches. It takes the bilinearly interpolated edge (see 
  * @PSEUDO_GATHER4), and adds 0, 1 or 2, depending on which edges and
  * crossing edges are active.
  */
 float SMAASearchLength(sampler2D searchTex, vec2 e, float offset) {
-    // The texture is flipped vertically, with left and right cases taking half
-    // of the space horizontally:
+    /*
+     * The texture is flipped vertically, with left and right cases taking half
+     * of the space horizontally:
+     */
     vec2 scale = SMAA_SEARCHTEX_SIZE * vec2(0.5, -1.0);
     vec2 bias = SMAA_SEARCHTEX_SIZE * vec2(offset, 1.0);
 
@@ -372,8 +374,10 @@ float SMAASearchLength(sampler2D searchTex, vec2 e, float offset) {
     scale += vec2(-1.0,  1.0);
     bias  += vec2( 0.5, -0.5);
 
-    // Convert from pixel coordinates to texcoords:
-    // (We use SMAA_SEARCHTEX_PACKED_SIZE because the texture is cropped)
+    /*
+     * Convert from pixel coordinates to texcoords:
+     * (We use SMAA_SEARCHTEX_PACKED_SIZE because the texture is cropped)
+     */
     scale *= 1.0 / SMAA_SEARCHTEX_PACKED_SIZE;
     bias *= 1.0 / SMAA_SEARCHTEX_PACKED_SIZE;
 
@@ -381,11 +385,9 @@ float SMAASearchLength(sampler2D searchTex, vec2 e, float offset) {
     return texture2D(searchTex, mad(scale, e, bias)).r;
 }
 
-/**
- * Horizontal/vertical search functions for the 2nd pass.
- */
+// Horizontal/vertical search functions for the 2nd pass.
 float SMAASearchXLeft(sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end) {
-    /**
+    /*
      * @PSEUDO_GATHER4
      * This texcoord has been offset by (-0.25, -0.125) in the vertex shader to
      * sample between edge, thus fetching four edges in a row.
@@ -436,7 +438,7 @@ float SMAASearchYDown(sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, fl
     return mad(-SMAA_RT_METRICS.y, offset, texcoord.y);
 }
 
-/** 
+/*
  * Ok, we have the distance and both crossing edges. So, what are the areas
  * at each side of current edge?
  */
@@ -454,8 +456,10 @@ vec2 SMAAArea(sampler2D areaTex, vec2 dist, float e1, float e2, float offset) {
     return texture2D(areaTex, texcoord).ra;
 }
 
-//-----------------------------------------------------------------------------
-// Corner Detection Functions
+/*
+ * -----------------------------------------------------------------------------
+ * Corner Detection Functions
+ */
 
 void SMAADetectHorizontalCornerPattern(sampler2D edgesTex, inout vec2 weights, vec4 texcoord, vec2 d) {
     vec2 leftRight = step(d.xy, d.yx);
@@ -487,8 +491,10 @@ void SMAADetectVerticalCornerPattern(sampler2D edgesTex, inout vec2 weights, vec
     weights *= clamp(factor, vec2(0.0), vec2(1.0));
 }
 
-//-----------------------------------------------------------------------------
-// Blending Weight Calculation Pixel Shader (Second Pass)
+/*
+ * -----------------------------------------------------------------------------
+ * Blending Weight Calculation Pixel Shader (Second Pass)
+ */
 
 vec4 SMAABlendingWeightCalculationPS(vec2 texcoord,
                                        vec2 pixcoord,
@@ -502,12 +508,16 @@ vec4 SMAABlendingWeightCalculationPS(vec2 texcoord,
     vec2 e = texture2D(edgesTex, texcoord).rg;
 
     if (e.g > 0.0) { // Edge at north
-        // Diagonals have both north and west edges, so searching for them in
-        // one of the boundaries is enough.
+        /*
+         * Diagonals have both north and west edges, so searching for them in
+         * one of the boundaries is enough.
+         */
         weights.rg = SMAACalculateDiagWeights(edgesTex, areaTex, texcoord, e, subsampleIndices);
 
-        // We give priority to diagonals, so if we find a diagonal we skip 
-        // horizontal/vertical processing.
+        /*
+         * We give priority to diagonals, so if we find a diagonal we skip 
+         * horizontal/vertical processing.
+         */
         if (weights.r == -weights.g) { // weights.r + weights.g == 0.0
 
         vec2 d;
@@ -518,28 +528,36 @@ vec4 SMAABlendingWeightCalculationPS(vec2 texcoord,
         coords.y = offset[1].y; // offset[1].y = texcoord.y - 0.25 * SMAA_RT_METRICS.y (@CROSSING_OFFSET)
         d.x = coords.x;
 
-        // Now fetch the left crossing edges, two at a time using bilinear
-        // filtering. Sampling at -0.25 (see @CROSSING_OFFSET) enables to
-        // discern what value each edge has:
+        /*
+         * Now fetch the left crossing edges, two at a time using bilinear
+         * filtering. Sampling at -0.25 (see @CROSSING_OFFSET) enables to
+         * discern what value each edge has:
+         */
         float e1 = texture2D(edgesTex, coords.xy).r;
 
         // Find the distance to the right:
         coords.z = SMAASearchXRight(edgesTex, searchTex, offset[0].zw, offset[2].y);
         d.y = coords.z;
 
-        // We want the distances to be in pixel units (doing this here allow to
-        // better interleave arithmetic and memory accesses):
+        /*
+         * We want the distances to be in pixel units (doing this here allow to
+         * better interleave arithmetic and memory accesses):
+         */
         d = abs(smaaRound(mad(SMAA_RT_METRICS.zz, d, -pixcoord.xx)));
 
-        // SMAAArea below needs a sqrt, as the areas texture is compressed
-        // quadratically:
+        /*
+         * SMAAArea below needs a sqrt, as the areas texture is compressed
+         * quadratically:
+         */
         vec2 sqrt_d = sqrt(d);
 
         // Fetch the right crossing edges:
         float e2 = smaaSampleOffset(edgesTex, coords.zy, ivec2(1, 0)).r;
 
-        // Ok, we know how this pattern looks like, now it is time for getting
-        // the actual area:
+        /*
+         * Ok, we know how this pattern looks like, now it is time for getting
+         * the actual area:
+         */
         weights.rg = SMAAArea(areaTex, sqrt_d, e1, e2, subsampleIndices.y);
 
         // Fix corners:
@@ -569,8 +587,10 @@ vec4 SMAABlendingWeightCalculationPS(vec2 texcoord,
         // We want the distances to be in pixel units:
         d = abs(smaaRound(mad(SMAA_RT_METRICS.ww, d, -pixcoord.yy)));
 
-        // SMAAArea below needs a sqrt, as the areas texture is compressed 
-        // quadratically:
+        /*
+         * SMAAArea below needs a sqrt, as the areas texture is compressed 
+         * quadratically:
+         */
         vec2 sqrt_d = sqrt(d);
 
         // Fetch the bottom crossing edges:
@@ -675,9 +695,11 @@ vec3 smaaLinearToSrgb(vec3 color) {
     );
 }
 void main() {
-    // The GL_RGBA8 copy contains display-encoded values without automatic
-    // sRGB decoding. Edge detection reads them directly; only blended pixels
-    // are decoded to linear light and encoded once after blending.
+    /*
+     * The GL_RGBA8 copy contains display-encoded values without automatic
+     * sRGB decoding. Edge detection reads them directly; only blended pixels
+     * are decoded to linear light and encoded once after blending.
+     */
     vec4 weights;
     weights.x = texture2D(u_blendTexture, v_offset.xy).a;
     weights.y = texture2D(u_blendTexture, v_offset.zw).g;

@@ -1,12 +1,15 @@
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
+#include "shaders/CasShader.hpp"
 #include "shaders/FxaaShader.hpp"
 #include "shaders/SmaaShader.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCEGLView.hpp>
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <string_view>
 
 using namespace geode::prelude;
@@ -21,7 +24,10 @@ namespace {
     };
 
     std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
+    std::atomic<bool> g_casEnabled = false;
+    std::atomic<float> g_casSharpness = 0.f;
     aa::render::PostProcessRenderer g_postProcessRenderer;
+    aa::render::PostProcessRenderer g_casRenderer;
     aa::render::SmaaRenderer g_smaaRenderer;
 
     void updateAntiAliasingMode(std::string_view value) {
@@ -44,12 +50,27 @@ namespace {
         g_antiAliasingMode.store(AntiAliasingMode::Off, std::memory_order_relaxed);
     }
 
+    void updateCasSharpness(double value) {
+        auto const sharpness = std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
+        g_casSharpness.store(static_cast<float>(sharpness), std::memory_order_relaxed);
+    }
+
 } // namespace
 
 $on_mod(Loaded) {
     updateAntiAliasingMode(Mod::get()->getSettingValue<std::string_view>("aa-mode"));
     listenForSettingChanges<std::string_view>("aa-mode", [](std::string_view value) {
         updateAntiAliasingMode(value);
+    });
+
+    g_casEnabled.store(Mod::get()->getSettingValue<bool>("cas-enabled"), std::memory_order_relaxed);
+    listenForSettingChanges<bool>("cas-enabled", [](bool value) {
+        g_casEnabled.store(value, std::memory_order_relaxed);
+    });
+
+    updateCasSharpness(Mod::get()->getSettingValue<double>("cas-sharpness"));
+    listenForSettingChanges<double>("cas-sharpness", [](double value) {
+        updateCasSharpness(value);
     });
 }
 
@@ -62,12 +83,18 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
 
     void swapBuffers() {
         static auto renderedMode = AntiAliasingMode::Off;
+        static bool renderedCasEnabled = false;
 
         auto const selectedMode = g_antiAliasingMode.load(std::memory_order_relaxed);
+        auto const casEnabled = g_casEnabled.load(std::memory_order_relaxed);
         if (selectedMode != renderedMode) {
             g_postProcessRenderer.reset();
             g_smaaRenderer.reset();
             renderedMode = selectedMode;
+        }
+        if (casEnabled != renderedCasEnabled) {
+            g_casRenderer.reset();
+            renderedCasEnabled = casEnabled;
         }
 
         switch (selectedMode) {
@@ -86,11 +113,18 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
             case AntiAliasingMode::Off: break;
         }
 
+        if (casEnabled) {
+            g_casRenderer.apply(
+                aa::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
+            );
+        }
+
         CCEGLView::swapBuffers();
     }
 
     void toggleFullScreen(bool value, bool borderless, bool fix) {
         g_postProcessRenderer.reset();
+        g_casRenderer.reset();
         g_smaaRenderer.reset();
         CCEGLView::toggleFullScreen(value, borderless, fix);
     }
