@@ -1,6 +1,6 @@
 #include "VhsShader.hpp"
 
-#include "../render/PostProcessRenderer.hpp"
+#include "../../render/PostProcessRenderer.hpp"
 
 /*
  * Code taken and modified from:

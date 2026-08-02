@@ -1,6 +1,6 @@
 #include "SmaaRenderer.hpp"
 
-#include "../shaders/SmaaLookupTextures.hpp"
+#include "../shaders/aa/SmaaLookupTextures.hpp"
 #include "GlStateGuard.hpp"
 #include "ShaderProgram.hpp"
 

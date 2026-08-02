@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../shaders/SmaaShader.hpp"
+#include "../shaders/aa/SmaaShader.hpp"
 #include "FullscreenQuad.hpp"
 
 #include <Geode/cocos/platform/CCGL.h>

@@ -1,6 +1,6 @@
 #include "DitheringShader.hpp"
 
-#include "../render/PostProcessRenderer.hpp"
+#include "../../render/PostProcessRenderer.hpp"
 
 /*
  * Ordered-dither method referenced from:

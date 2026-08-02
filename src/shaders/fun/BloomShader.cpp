@@ -1,6 +1,6 @@
 #include "BloomShader.hpp"
 
-#include "../render/PostProcessRenderer.hpp"
+#include "../../render/PostProcessRenderer.hpp"
 
 /*
  * Based on the single-pass kernel structure from:

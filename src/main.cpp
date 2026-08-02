@@ -1,14 +1,14 @@
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
-#include "shaders/BloomShader.hpp"
-#include "shaders/CasShader.hpp"
-#include "shaders/CrtShader.hpp"
-#include "shaders/DitheringShader.hpp"
-#include "shaders/FxaaShader.hpp"
-#include "shaders/GrayscaleShader.hpp"
-#include "shaders/PixelateShader.hpp"
-#include "shaders/SmaaShader.hpp"
-#include "shaders/VhsShader.hpp"
+#include "shaders/aa/FxaaShader.hpp"
+#include "shaders/aa/SmaaShader.hpp"
+#include "shaders/fun/BloomShader.hpp"
+#include "shaders/fun/CrtShader.hpp"
+#include "shaders/fun/DitheringShader.hpp"
+#include "shaders/fun/GrayscaleShader.hpp"
+#include "shaders/fun/PixelateShader.hpp"
+#include "shaders/fun/VhsShader.hpp"
+#include "shaders/sharpen/CasShader.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>

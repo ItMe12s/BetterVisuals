@@ -1,6 +1,6 @@
 #include "PixelateShader.hpp"
 
-#include "../render/PostProcessRenderer.hpp"
+#include "../../render/PostProcessRenderer.hpp"
 
 /*
  * Based on the texture-coordinate snapping from:

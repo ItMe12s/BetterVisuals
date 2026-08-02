@@ -1,6 +1,6 @@
 #include "GrayscaleShader.hpp"
 
-#include "../render/PostProcessRenderer.hpp"
+#include "../../render/PostProcessRenderer.hpp"
 
 namespace aa::shaders::grayscale {
 

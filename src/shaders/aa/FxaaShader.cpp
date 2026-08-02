@@ -1,6 +1,6 @@
 #include "FxaaShader.hpp"
 
-#include "../render/PostProcessRenderer.hpp"
+#include "../../render/PostProcessRenderer.hpp"
 
 /*
  * References used:
