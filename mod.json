@@ -9,9 +9,13 @@
 	"developer": "imes",
 	"description": "Simple anti-aliasing mod.",
 	"settings": {
+		"aa-title": {
+			"type": "title",
+			"name": "Anti-aliasing"
+		},
 		"aa-mode": {
 			"type": "string",
-			"name": "Anti-Aliasing",
+			"name": "AA Mode",
 			"description": "Fullscreen (game window) anti-aliasing mode.",
 			"default": "SMAA High",
 			"one-of": [

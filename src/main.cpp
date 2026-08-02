@@ -21,6 +21,8 @@ namespace {
     };
 
     std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
+    aa::render::PostProcessRenderer g_postProcessRenderer;
+    aa::render::SmaaRenderer g_smaaRenderer;
 
     void updateAntiAliasingMode(std::string_view value) {
         if (value == "SMAA High") {
@@ -59,31 +61,37 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     }
 
     void swapBuffers() {
-        static aa::render::PostProcessRenderer postProcessRenderer;
-        static aa::render::SmaaRenderer smaaRenderer;
         static auto renderedMode = AntiAliasingMode::Off;
 
         auto const selectedMode = g_antiAliasingMode.load(std::memory_order_relaxed);
         if (selectedMode != renderedMode) {
-            postProcessRenderer.reset();
-            smaaRenderer.reset();
+            g_postProcessRenderer.reset();
+            g_smaaRenderer.reset();
             renderedMode = selectedMode;
         }
 
         switch (selectedMode) {
-            case AntiAliasingMode::Fxaa: postProcessRenderer.apply(aa::shaders::kFxaaShader); break;
+            case AntiAliasingMode::Fxaa:
+                g_postProcessRenderer.apply(aa::shaders::kFxaaShader);
+                break;
 
             case AntiAliasingMode::SmaaHigh:
-                smaaRenderer.apply(aa::shaders::kSmaaHighShaderSet);
+                g_smaaRenderer.apply(aa::shaders::kSmaaHighShaderSet);
                 break;
 
             case AntiAliasingMode::SmaaUltra:
-                smaaRenderer.apply(aa::shaders::kSmaaUltraShaderSet);
+                g_smaaRenderer.apply(aa::shaders::kSmaaUltraShaderSet);
                 break;
 
             case AntiAliasingMode::Off: break;
         }
 
         CCEGLView::swapBuffers();
+    }
+
+    void toggleFullScreen(bool value, bool borderless, bool fix) {
+        g_postProcessRenderer.reset();
+        g_smaaRenderer.reset();
+        CCEGLView::toggleFullScreen(value, borderless, fix);
     }
 };
