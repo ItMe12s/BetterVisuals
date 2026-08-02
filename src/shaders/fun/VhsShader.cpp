@@ -37,26 +37,33 @@ vec3 sampleVhs(vec2 uv) {
 }
 
 float hash(vec2 value) {
-    return fract(sin(dot(value, vec2(89.44, 19.36))) * 22189.22);
+    vec3 value3 = fract(value.xyx * 0.1031);
+    value3 += dot(value3, value3.yzx + 33.33);
+    return fract((value3.x + value3.y) * value3.z);
 }
 
-float interpolatedHash(vec2 value, vec2 resolution) {
-    float h00 = hash(floor(value * resolution) / resolution);
-    float h10 = hash(floor(value * resolution + vec2(1.0, 0.0)) / resolution);
-    float h01 = hash(floor(value * resolution + vec2(0.0, 1.0)) / resolution);
-    float h11 = hash(floor(value * resolution + vec2(1.0, 1.0)) / resolution);
-    vec2 phase = smoothstep(vec2(0.0), vec2(1.0), mod(value * resolution, 1.0));
+float interpolatedHash(vec2 value, float resolution) {
+    vec2 scaledValue = value * resolution;
+    float invResolution = 1.0 / resolution;
+    vec2 base = floor(scaledValue) * invResolution;
+    float h00 = hash(base);
+    float h10 = hash(base + vec2(invResolution, 0.0));
+    float h01 = hash(base + vec2(0.0, invResolution));
+    float h11 = hash(base + vec2(invResolution));
+    vec2 phase = smoothstep(vec2(0.0), vec2(1.0), fract(scaledValue));
     return mix(mix(h00, h10, phase.x), mix(h01, h11, phase.x), phase.y);
 }
 
 float noise(vec2 value) {
     float sum = 0.0;
-    for (int octave = 1; octave < 9; ++octave) {
-        float frequency = pow(2.0, float(octave));
-        sum += interpolatedHash(value + vec2(float(octave)), vec2(2.0 * frequency)) /
-            frequency;
+    float resolution = 4.0;
+    float weight = 0.5;
+    for (int octave = 1; octave < 3; ++octave) {
+        sum += interpolatedHash(value + vec2(float(octave)), resolution) * weight;
+        resolution *= 2.0;
+        weight *= 0.5;
     }
-    return sum;
+    return sum * (85.0 / 64.0);
 }
 
 void main() {
@@ -69,34 +76,46 @@ void main() {
 
     distortedUv.x +=
         (noise(vec2(distortedUv.y, u_time)) - 0.5) * 0.005 * DISTORTION_STRENGTH;
-    float highFrequencyNoise = noise(vec2(distortedUv.y * 100.0, u_time * 10.0));
-    distortedUv.x += (highFrequencyNoise - 0.5) * 0.01 * DISTORTION_STRENGTH;
+    float highFrequencyOffset = noise(vec2(distortedUv.y * 100.0, u_time * 10.0)) - 0.5;
+    distortedUv.x += highFrequencyOffset * 0.01 * DISTORTION_STRENGTH;
 
     float creasePhase = clamp(
         (sin(distortedUv.y * 8.0 - u_time * PI * 1.2) - 0.92) * noise(vec2(u_time)),
         0.0,
         0.01
     ) * 10.0;
-    float creaseNoise = max(highFrequencyNoise - 0.5, 0.0);
+    float creaseNoise = max(highFrequencyOffset, 0.0);
     distortedUv.x -= creaseNoise * creasePhase * DISTORTION_STRENGTH;
 
     float switchingPhase = 1.0 - smoothstep(0.0, 0.03, distortedUv.y);
     distortedUv.y += switchingPhase * 0.3 * DISTORTION_STRENGTH;
     distortedUv.x +=
-        switchingPhase * ((highFrequencyNoise - 0.5) * 0.2) * DISTORTION_STRENGTH;
+        switchingPhase * highFrequencyOffset * 0.2 * DISTORTION_STRENGTH;
 
-    vec3 color = sampleVhs(distortedUv);
+    vec3 centerColor = vec3(0.0);
+    vec3 chromaBlur = vec3(0.0);
+    for (int tap = 0; tap < 7; ++tap) {
+        float offset = float(tap) - 6.0;
+        vec3 tapColor =
+            sampleVhs(distortedUv + vec2(offset, 0.0) * 0.007 * DISTORTION_STRENGTH);
+        if (tap == 6) {
+            centerColor = tapColor;
+        }
+        if (tap >= 4) {
+            chromaBlur.r += tapColor.r;
+        }
+        if (tap >= 2 && tap <= 4) {
+            chromaBlur.g += tapColor.g;
+        }
+        if (tap <= 2) {
+            chromaBlur.b += tapColor.b;
+        }
+    }
+
+    vec3 color = centerColor;
     color *= 1.0 - creasePhase;
     color = mix(color, color.yzx, switchingPhase);
-
-    for (int tap = 0; tap < 7; ++tap) {
-        float offset = float(tap) - 4.0;
-        color += vec3(
-            sampleVhs(distortedUv + vec2(offset, 0.0) * 0.007 * DISTORTION_STRENGTH).r,
-            sampleVhs(distortedUv + vec2(offset - 2.0, 0.0) * 0.007 * DISTORTION_STRENGTH).g,
-            sampleVhs(distortedUv + vec2(offset - 4.0, 0.0) * 0.007 * DISTORTION_STRENGTH).b
-        ) * 0.1;
-    }
+    color += chromaBlur * (0.7 / 3.0);
     color *= 0.6;
 
     color *= 1.0 + clamp(
