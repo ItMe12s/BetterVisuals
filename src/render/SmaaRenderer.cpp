@@ -267,7 +267,7 @@ namespace aa::render {
             return;
         }
 
-        GlStateGuard state{GlStateProfile::Smaa};
+        GlStateGuard state{GlStateProfile::Multipass};
         glActiveTexture(GL_TEXTURE0);
         auto const& viewport = state.viewport();
         auto const width = static_cast<GLsizei>(viewport[2]);

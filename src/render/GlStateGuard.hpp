@@ -7,7 +7,7 @@ namespace aa::render {
 
     enum class GlStateProfile {
         PostProcess,
-        Smaa,
+        Multipass,
     };
 
     struct VertexAttributeState {

@@ -57,7 +57,7 @@ namespace aa::render {
         glGetIntegerv(GL_CURRENT_PROGRAM, &state.program);
         glGetIntegerv(GL_ACTIVE_TEXTURE, &state.activeTexture);
 
-        auto const textureCount = profile == GlStateProfile::Smaa ? state.textures2D.size() : 1;
+        auto const textureCount = profile == GlStateProfile::Multipass ? state.textures2D.size() : 1;
         for (std::size_t index = 0; index < textureCount; ++index) {
             glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(index));
             glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.textures2D[index]);
@@ -66,7 +66,7 @@ namespace aa::render {
 
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &state.arrayBuffer);
         glGetIntegerv(GL_VIEWPORT, state.viewport.data());
-        if (profile == GlStateProfile::Smaa) {
+        if (profile == GlStateProfile::Multipass) {
             glGetFloatv(GL_COLOR_CLEAR_VALUE, state.clearColor.data());
         }
         glGetBooleanv(GL_COLOR_WRITEMASK, state.colorMask.data());
@@ -76,7 +76,7 @@ namespace aa::render {
         state.scissorTest = glIsEnabled(GL_SCISSOR_TEST);
         state.cullFace = glIsEnabled(GL_CULL_FACE);
 
-        if (profile == GlStateProfile::Smaa) {
+        if (profile == GlStateProfile::Multipass) {
             state.separateFramebufferBindings = GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object;
             state.framebufferSupported =
                 state.separateFramebufferBindings || GLEW_EXT_framebuffer_object;
@@ -106,7 +106,8 @@ namespace aa::render {
         restoreVertexAttribute(FullscreenQuad::kTexCoordAttribute, state.attributes[1]);
         glBindBuffer(GL_ARRAY_BUFFER, state.arrayBuffer);
 
-        auto const textureCount = state.profile == GlStateProfile::Smaa ? state.textures2D.size() : 1;
+        auto const textureCount =
+            state.profile == GlStateProfile::Multipass ? state.textures2D.size() : 1;
         for (std::size_t index = 0; index < textureCount; ++index) {
             glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(index));
             glBindTexture(GL_TEXTURE_2D, state.textures2D[index]);
@@ -114,7 +115,7 @@ namespace aa::render {
         glActiveTexture(state.activeTexture);
         glUseProgram(state.program);
 
-        if (state.profile == GlStateProfile::Smaa) {
+        if (state.profile == GlStateProfile::Multipass) {
             if (state.separateFramebufferBindings) {
                 glBindFramebuffer(GL_READ_FRAMEBUFFER, state.readFramebuffer);
                 glBindFramebuffer(GL_DRAW_FRAMEBUFFER, state.drawFramebuffer);
@@ -154,7 +155,7 @@ namespace aa::render {
     }
 
     void GlStateGuard::bindOriginalReadFramebuffer() const {
-        assert(m_state.profile == GlStateProfile::Smaa);
+        assert(m_state.profile == GlStateProfile::Multipass);
         if (m_state.separateFramebufferBindings) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER, m_state.readFramebuffer);
         }
@@ -164,7 +165,7 @@ namespace aa::render {
     }
 
     void GlStateGuard::bindOriginalDrawFramebuffer() const {
-        assert(m_state.profile == GlStateProfile::Smaa);
+        assert(m_state.profile == GlStateProfile::Multipass);
         if (m_state.separateFramebufferBindings) {
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_state.drawFramebuffer);
         }

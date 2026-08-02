@@ -1,8 +1,8 @@
+#include "render/BloomRenderer.hpp"
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
 #include "shaders/aa/FxaaShader.hpp"
 #include "shaders/aa/SmaaShader.hpp"
-#include "shaders/fun/BloomShader.hpp"
 #include "shaders/fun/CrtShader.hpp"
 #include "shaders/fun/DitheringShader.hpp"
 #include "shaders/fun/GrayscaleShader.hpp"
@@ -41,7 +41,7 @@ namespace {
     std::atomic<bool> g_crtEnabled = false;
     aa::render::PostProcessRenderer g_postProcessRenderer;
     aa::render::PostProcessRenderer g_casRenderer;
-    aa::render::PostProcessRenderer g_bloomRenderer;
+    aa::render::BloomRenderer g_bloomRenderer;
     aa::render::PostProcessRenderer g_grayscaleRenderer;
     aa::render::PostProcessRenderer g_pixelateRenderer;
     aa::render::PostProcessRenderer g_ditheringRenderer;
@@ -210,7 +210,7 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
             );
         }
         if (bloomEnabled) {
-            g_bloomRenderer.apply(aa::shaders::kBloomShader);
+            g_bloomRenderer.apply();
         }
         if (grayscaleEnabled) {
             g_grayscaleRenderer.apply(aa::shaders::kGrayscaleShader);
