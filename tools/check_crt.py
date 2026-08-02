@@ -1,5 +1,7 @@
 from math import isclose, isfinite, pow, sin, sqrt
 
+REFERENCE_HEIGHT = 1080
+
 
 def curve(x: float, y: float) -> tuple[float, float]:
     x = (x - 0.5) * 2.0 * 1.1
@@ -25,13 +27,24 @@ def vignette(x: float, y: float) -> float:
     return 1.3 * sqrt(value)
 
 
+def display_scale(height: int) -> float:
+    return height / REFERENCE_HEIGHT
+
+
+def reference_pixel(coordinate: float, resolution: int, height: int) -> float:
+    return coordinate * resolution / display_scale(height)
+
+
 def scanline(y: float, height: int) -> float:
-    value = min(max(0.35 + 0.18 * sin(y * height * 1.5), 0.0), 1.0)
+    value = min(
+        max(0.35 + 0.18 * sin(reference_pixel(y, height, height) * 1.5), 0.0),
+        1.0,
+    )
     return pow(value, 0.9)
 
 
-def shadow_mask(x: float) -> float:
-    phase = min(max((x % 3.0) / 2.0, 0.0), 1.0)
+def shadow_mask(x: float, height: int) -> float:
+    phase = min(max(((x / display_scale(height)) % 3.0) / 2.0, 0.0), 1.0)
     return 1.0 - 0.23 * phase
 
 
@@ -62,12 +75,18 @@ def main() -> None:
             assert 0.4 <= value <= 1.4
 
     for y in (0.0, 0.1, 0.5, 0.9, 1.0):
-        value = scanline(y, 1080)
-        assert isfinite(value)
-        assert 0.0 <= value <= 1.0
+        value_1080 = scanline(y, 1080)
+        value_2160 = scanline(y, 2160)
+        assert isfinite(value_1080)
+        assert 0.0 <= value_1080 <= 1.0
+        assert isclose(value_1080, value_2160)
 
-    for x in (0.0, 0.5, 1.0, 2.0, 2.5):
-        assert isclose(shadow_mask(x), shadow_mask(x + 3.0))
+    for x in (0.0, 0.5, 1.0, 2.0, 2.5, 100.5):
+        value_1080 = shadow_mask(x, 1080)
+        value_1440 = shadow_mask(x * display_scale(1440), 1440)
+        value_2160 = shadow_mask(x * display_scale(2160), 2160)
+        assert isclose(value_1080, value_1440)
+        assert isclose(value_1080, value_2160)
 
     assert edge_mask(-0.01, 0.5) == 0.0
     assert edge_mask(0.0, 0.5) == 0.0

@@ -32,8 +32,10 @@ void main() {
         vec2(1.0) - 0.5 * u_invResolution
     );
     vec4 source = texture2D(u_texture, sourceUv);
+    float displayScale = (1.0 / u_invResolution.y) / 1080.0;
+    float blockSize = max(floor(4.0 * displayScale + 0.5), 1.0);
     vec2 pixel = v_texCoord / u_invResolution;
-    vec2 uv = (floor(pixel / 4.0) * 4.0 + 2.0) * u_invResolution;
+    vec2 uv = (floor(pixel / blockSize) + 0.5) * blockSize * u_invResolution;
     uv = clamp(uv, 0.5 * u_invResolution, vec2(1.0) - 0.5 * u_invResolution);
     gl_FragColor = vec4(texture2D(u_texture, uv).rgb, source.a);
 }

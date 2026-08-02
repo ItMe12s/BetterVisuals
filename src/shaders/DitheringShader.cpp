@@ -37,18 +37,17 @@ float bayer4Value(vec2 cell) {
     return 4.0 * bayer2(mod(cell, 2.0)) + bayer2(floor(cell / 2.0));
 }
 
-float bayer8(vec2 pixel) {
-    vec2 cell = mod(floor(pixel), 8.0);
-    float value = 4.0 * bayer4Value(mod(cell, 4.0)) + bayer2(floor(cell / 4.0));
-    return (value + 0.5) / 64.0;
-}
-
 void main() {
-    vec2 uv = clamp(v_texCoord, 0.5 * u_invResolution, vec2(1.0) - 0.5 * u_invResolution);
+    float displayScale = (1.0 / u_invResolution.y) / 1080.0;
+    float cellSize = max(floor(4.0 * displayScale + 0.5), 1.0);
+    vec2 cell = floor((v_texCoord / u_invResolution) / cellSize);
+    vec2 uv = (cell + 0.5) * cellSize * u_invResolution;
+    uv = clamp(uv, 0.5 * u_invResolution, vec2(1.0) - 0.5 * u_invResolution);
     vec4 source = texture2D(u_texture, uv);
-    float threshold = bayer8(v_texCoord / u_invResolution);
-    vec3 scaled = source.rgb * 7.0;
-    vec3 color = (floor(scaled) + step(vec3(threshold), fract(scaled))) / 7.0;
+    float threshold = (bayer4Value(cell) + 0.5) / 16.0;
+    vec3 channelMax = vec3(7.0, 7.0, 3.0);
+    vec3 scaled = source.rgb * channelMax;
+    vec3 color = (floor(scaled) + step(vec3(threshold), fract(scaled))) / channelMax;
     gl_FragColor = vec4(clamp(color, 0.0, 1.0), source.a);
 }
 )glsl";

@@ -74,7 +74,7 @@
 		"dithering-enabled": {
 			"type": "bool",
 			"name": "Dithering Filter",
-			"description": "Apply 8x8 ordered color dithering.",
+			"description": "Apply a RGB332 palette color dithering.",
 			"default": false
 		},
 		"vhs-enabled": {

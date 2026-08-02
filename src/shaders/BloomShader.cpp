@@ -32,9 +32,10 @@ vec3 brightPass(vec3 color) {
 void main() {
     vec4 source = texture2D(u_texture, v_texCoord);
     vec3 bloom = vec3(0.0);
+    float displayScale = (1.0 / u_invResolution.y) / 1080.0;
     for (int y = -6; y <= 6; ++y) {
         for (int x = -6; x <= 6; ++x) {
-            vec2 offset = vec2(float(x), float(y)) * u_invResolution;
+            vec2 offset = vec2(float(x), float(y)) * u_invResolution * displayScale;
             bloom += brightPass(texture2D(u_texture, v_texCoord + offset).rgb);
         }
     }
