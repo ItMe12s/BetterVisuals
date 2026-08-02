@@ -8,6 +8,15 @@
 	"version": "v1.0.0",
 	"developer": "imes",
 	"description": "Neat anti-aliasing and post-processing mod.",
+	"tags": [
+		"universal",
+		"enhancement",
+		"customization"
+	],
+	"links": {
+		"community": "https://discord.gg/E8f6D6XqbW",
+		"source": "https://github.com/ItMe12s/BetterVisuals"
+	},
 	"settings": {
 		"aa-title": {
 			"type": "title",
