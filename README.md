@@ -39,4 +39,6 @@ Extra shaders you can mix and match:
 
 Join the Discord server or make a GitHub issue/feature request!
 
-Credits, citations, and licenses are in the mod's source code.
+Framebuffer and VBO handling referenced from [DevTools](https://github.com/geode-sdk/DevTools).
+
+Other credits, citations, and licenses are in the mod's source code.

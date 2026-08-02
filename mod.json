@@ -13,6 +13,7 @@
 	"description": "Neat anti-aliasing and post-processing mod.",
 	"tags": [
 		"universal",
+		"offline",
 		"enhancement",
 		"customization"
 	],
@@ -74,19 +75,19 @@
 		"grayscale-enabled": {
 			"type": "bool",
 			"name": "Grayscale",
-			"description": "Convert the display to grayscale.",
+			"description": "Apply a grayscale filter.",
 			"default": false
 		},
 		"pixelate-enabled": {
 			"type": "bool",
 			"name": "Pixelate",
-			"description": "Apply a 4-pixel block effect.",
+			"description": "Apply a pixelated effect.",
 			"default": false
 		},
 		"dithering-enabled": {
 			"type": "bool",
 			"name": "Dithering Filter",
-			"description": "Apply a RGB332 palette color dithering.",
+			"description": "Apply an 8-bit color palette dithering.",
 			"default": false
 		},
 		"vhs-enabled": {
