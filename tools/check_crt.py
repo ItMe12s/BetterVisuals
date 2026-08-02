@@ -1,6 +1,9 @@
 from math import isclose, isfinite, pow, sin, sqrt
 
 REFERENCE_HEIGHT = 1080
+SCANLINE_FREQUENCY = 1.2
+MASK_PERIOD = 3.75
+MASK_RAMP = 2.5
 
 
 def curve(x: float, y: float) -> tuple[float, float]:
@@ -37,14 +40,17 @@ def reference_pixel(coordinate: float, resolution: int, height: int) -> float:
 
 def scanline(y: float, height: int) -> float:
     value = min(
-        max(0.35 + 0.18 * sin(reference_pixel(y, height, height) * 1.5), 0.0),
+        max(
+            0.35 + 0.18 * sin(reference_pixel(y, height, height) * SCANLINE_FREQUENCY),
+            0.0,
+        ),
         1.0,
     )
     return pow(value, 0.9)
 
 
 def shadow_mask(x: float, height: int) -> float:
-    phase = min(max(((x / display_scale(height)) % 3.0) / 2.0, 0.0), 1.0)
+    phase = min(max(((x / display_scale(height)) % MASK_PERIOD) / MASK_RAMP, 0.0), 1.0)
     return 1.0 - 0.23 * phase
 
 
@@ -55,6 +61,10 @@ def edge_mask(x: float, y: float) -> float:
 
 
 def main() -> None:
+    assert isclose(SCANLINE_FREQUENCY, 1.5 / 1.25)
+    assert isclose(MASK_PERIOD, 3.0 * 1.25)
+    assert isclose(MASK_RAMP, 2.0 * 1.25)
+
     assert warp(0.5, 0.5) == (0.5, 0.5)
     for x, y in ((0.1, 0.2), (0.25, 0.75), (0.4, 0.9)):
         curved_x, curved_y = warp(x, y)

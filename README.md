@@ -33,8 +33,10 @@ Extra shaders you can mix and match:
 - VHS Filter
 - CRT Filter
 
+*These may lag on mobile or low-end devices.*
+
 ## Want more AA methods and shaders?
 
 Join the Discord server or make a GitHub issue/feature request!
 
-Credits, citations, and licenses are available in the mod's source code.
+Credits, citations, and licenses are in the mod's source code.

@@ -87,9 +87,9 @@ void main() {
     float displayScale = height / 1080.0;
     float referenceY = curvedUv.y * height / displayScale;
     float referenceX = gl_FragCoord.x / displayScale;
-    float scanline = clamp(0.35 + 0.18 * sin(referenceY * 1.5), 0.0, 1.0);
+    float scanline = clamp(0.35 + 0.18 * sin(referenceY * 1.2), 0.0, 1.0);
     color *= pow(scanline, 0.9);
-    color *= 1.0 - 0.23 * clamp(mod(referenceX, 3.0) / 2.0, 0.0, 1.0);
+    color *= 1.0 - 0.23 * clamp(mod(referenceX, 3.75) / 2.5, 0.0, 1.0);
     color = filmic(color);
 
     vec2 edgeDistance = min(curvedUv, vec2(1.0) - curvedUv);
