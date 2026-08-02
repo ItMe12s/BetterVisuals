@@ -48,6 +48,16 @@
 				"slider": true,
 				"slider-step": 0.05
 			}
+		},
+		"fun-title": {
+			"type": "title",
+			"name": "Fun"
+		},
+		"crt-enabled": {
+			"type": "bool",
+			"name": "CRT Filter",
+			"description": "Apply a CRT-style filter.",
+			"default": false
 		}
 	}
 }

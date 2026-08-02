@@ -1,6 +1,7 @@
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
 #include "shaders/CasShader.hpp"
+#include "shaders/CrtShader.hpp"
 #include "shaders/FxaaShader.hpp"
 #include "shaders/SmaaShader.hpp"
 
@@ -26,8 +27,10 @@ namespace {
     std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
+    std::atomic<bool> g_crtEnabled = false;
     aa::render::PostProcessRenderer g_postProcessRenderer;
     aa::render::PostProcessRenderer g_casRenderer;
+    aa::render::PostProcessRenderer g_crtRenderer;
     aa::render::SmaaRenderer g_smaaRenderer;
 
     void updateAntiAliasingMode(std::string_view value) {
@@ -72,6 +75,11 @@ $on_mod(Loaded) {
     listenForSettingChanges<double>("cas-sharpness", [](double value) {
         updateCasSharpness(value);
     });
+
+    g_crtEnabled.store(Mod::get()->getSettingValue<bool>("crt-enabled"), std::memory_order_relaxed);
+    listenForSettingChanges<bool>("crt-enabled", [](bool value) {
+        g_crtEnabled.store(value, std::memory_order_relaxed);
+    });
 }
 
 class $modify(AntiAliasingCCEGLView, CCEGLView) {
@@ -84,9 +92,11 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void swapBuffers() {
         static auto renderedMode = AntiAliasingMode::Off;
         static bool renderedCasEnabled = false;
+        static bool renderedCrtEnabled = false;
 
         auto const selectedMode = g_antiAliasingMode.load(std::memory_order_relaxed);
         auto const casEnabled = g_casEnabled.load(std::memory_order_relaxed);
+        auto const crtEnabled = g_crtEnabled.load(std::memory_order_relaxed);
         if (selectedMode != renderedMode) {
             g_postProcessRenderer.reset();
             g_smaaRenderer.reset();
@@ -95,6 +105,10 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
         if (casEnabled != renderedCasEnabled) {
             g_casRenderer.reset();
             renderedCasEnabled = casEnabled;
+        }
+        if (crtEnabled != renderedCrtEnabled) {
+            g_crtRenderer.reset();
+            renderedCrtEnabled = crtEnabled;
         }
 
         switch (selectedMode) {
@@ -118,6 +132,9 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
                 aa::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
             );
         }
+        if (crtEnabled) {
+            g_crtRenderer.apply(aa::shaders::kCrtShader);
+        }
 
         CCEGLView::swapBuffers();
     }
@@ -125,6 +142,7 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void toggleFullScreen(bool value, bool borderless, bool fix) {
         g_postProcessRenderer.reset();
         g_casRenderer.reset();
+        g_crtRenderer.reset();
         g_smaaRenderer.reset();
         CCEGLView::toggleFullScreen(value, borderless, fix);
     }
