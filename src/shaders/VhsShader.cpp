@@ -2,7 +2,10 @@
 
 #include "../render/PostProcessRenderer.hpp"
 
-// https://www.shadertoy.com/view/XtBXDt
+/*
+ * Code taken and modified from:
+ * https://www.shadertoy.com/view/XtBXDt
+ */
 
 namespace aa::shaders::vhs {
 

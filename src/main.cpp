@@ -1,8 +1,12 @@
 #include "render/PostProcessRenderer.hpp"
 #include "render/SmaaRenderer.hpp"
+#include "shaders/BloomShader.hpp"
 #include "shaders/CasShader.hpp"
 #include "shaders/CrtShader.hpp"
+#include "shaders/DitheringShader.hpp"
 #include "shaders/FxaaShader.hpp"
+#include "shaders/GrayscaleShader.hpp"
+#include "shaders/PixelateShader.hpp"
 #include "shaders/SmaaShader.hpp"
 #include "shaders/VhsShader.hpp"
 
@@ -29,10 +33,18 @@ namespace {
     std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
+    std::atomic<bool> g_bloomEnabled = false;
+    std::atomic<bool> g_grayscaleEnabled = false;
+    std::atomic<bool> g_pixelateEnabled = false;
+    std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
     aa::render::PostProcessRenderer g_postProcessRenderer;
     aa::render::PostProcessRenderer g_casRenderer;
+    aa::render::PostProcessRenderer g_bloomRenderer;
+    aa::render::PostProcessRenderer g_grayscaleRenderer;
+    aa::render::PostProcessRenderer g_pixelateRenderer;
+    aa::render::PostProcessRenderer g_ditheringRenderer;
     aa::render::PostProcessRenderer g_vhsRenderer;
     aa::render::PostProcessRenderer g_crtRenderer;
     aa::render::SmaaRenderer g_smaaRenderer;
@@ -80,6 +92,32 @@ $on_mod(Loaded) {
         updateCasSharpness(value);
     });
 
+    g_bloomEnabled.store(Mod::get()->getSettingValue<bool>("bloom-enabled"), std::memory_order_relaxed);
+    listenForSettingChanges<bool>("bloom-enabled", [](bool value) {
+        g_bloomEnabled.store(value, std::memory_order_relaxed);
+    });
+
+    g_grayscaleEnabled.store(
+        Mod::get()->getSettingValue<bool>("grayscale-enabled"), std::memory_order_relaxed
+    );
+    listenForSettingChanges<bool>("grayscale-enabled", [](bool value) {
+        g_grayscaleEnabled.store(value, std::memory_order_relaxed);
+    });
+
+    g_pixelateEnabled.store(
+        Mod::get()->getSettingValue<bool>("pixelate-enabled"), std::memory_order_relaxed
+    );
+    listenForSettingChanges<bool>("pixelate-enabled", [](bool value) {
+        g_pixelateEnabled.store(value, std::memory_order_relaxed);
+    });
+
+    g_ditheringEnabled.store(
+        Mod::get()->getSettingValue<bool>("dithering-enabled"), std::memory_order_relaxed
+    );
+    listenForSettingChanges<bool>("dithering-enabled", [](bool value) {
+        g_ditheringEnabled.store(value, std::memory_order_relaxed);
+    });
+
     g_vhsEnabled.store(Mod::get()->getSettingValue<bool>("vhs-enabled"), std::memory_order_relaxed);
     listenForSettingChanges<bool>("vhs-enabled", [](bool value) {
         g_vhsEnabled.store(value, std::memory_order_relaxed);
@@ -101,11 +139,19 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void swapBuffers() {
         static auto renderedMode = AntiAliasingMode::Off;
         static bool renderedCasEnabled = false;
+        static bool renderedBloomEnabled = false;
+        static bool renderedGrayscaleEnabled = false;
+        static bool renderedPixelateEnabled = false;
+        static bool renderedDitheringEnabled = false;
         static bool renderedVhsEnabled = false;
         static bool renderedCrtEnabled = false;
 
         auto const selectedMode = g_antiAliasingMode.load(std::memory_order_relaxed);
         auto const casEnabled = g_casEnabled.load(std::memory_order_relaxed);
+        auto const bloomEnabled = g_bloomEnabled.load(std::memory_order_relaxed);
+        auto const grayscaleEnabled = g_grayscaleEnabled.load(std::memory_order_relaxed);
+        auto const pixelateEnabled = g_pixelateEnabled.load(std::memory_order_relaxed);
+        auto const ditheringEnabled = g_ditheringEnabled.load(std::memory_order_relaxed);
         auto const vhsEnabled = g_vhsEnabled.load(std::memory_order_relaxed);
         auto const crtEnabled = g_crtEnabled.load(std::memory_order_relaxed);
         if (selectedMode != renderedMode) {
@@ -116,6 +162,22 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
         if (casEnabled != renderedCasEnabled) {
             g_casRenderer.reset();
             renderedCasEnabled = casEnabled;
+        }
+        if (bloomEnabled != renderedBloomEnabled) {
+            g_bloomRenderer.reset();
+            renderedBloomEnabled = bloomEnabled;
+        }
+        if (grayscaleEnabled != renderedGrayscaleEnabled) {
+            g_grayscaleRenderer.reset();
+            renderedGrayscaleEnabled = grayscaleEnabled;
+        }
+        if (pixelateEnabled != renderedPixelateEnabled) {
+            g_pixelateRenderer.reset();
+            renderedPixelateEnabled = pixelateEnabled;
+        }
+        if (ditheringEnabled != renderedDitheringEnabled) {
+            g_ditheringRenderer.reset();
+            renderedDitheringEnabled = ditheringEnabled;
         }
         if (vhsEnabled != renderedVhsEnabled) {
             g_vhsRenderer.reset();
@@ -147,6 +209,18 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
                 aa::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
             );
         }
+        if (bloomEnabled) {
+            g_bloomRenderer.apply(aa::shaders::kBloomShader);
+        }
+        if (grayscaleEnabled) {
+            g_grayscaleRenderer.apply(aa::shaders::kGrayscaleShader);
+        }
+        if (pixelateEnabled) {
+            g_pixelateRenderer.apply(aa::shaders::kPixelateShader);
+        }
+        if (ditheringEnabled) {
+            g_ditheringRenderer.apply(aa::shaders::kDitheringShader);
+        }
         if (vhsEnabled) {
             static auto const clockStart = std::chrono::steady_clock::now();
             auto const elapsed =
@@ -163,6 +237,10 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
     void toggleFullScreen(bool value, bool borderless, bool fix) {
         g_postProcessRenderer.reset();
         g_casRenderer.reset();
+        g_bloomRenderer.reset();
+        g_grayscaleRenderer.reset();
+        g_pixelateRenderer.reset();
+        g_ditheringRenderer.reset();
         g_vhsRenderer.reset();
         g_crtRenderer.reset();
         g_smaaRenderer.reset();

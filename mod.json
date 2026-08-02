@@ -7,7 +7,7 @@
 	"name": "Anti-aliasing Mod",
 	"version": "v1.0.0",
 	"developer": "imes",
-	"description": "Simple anti-aliasing mod.",
+	"description": "Neat anti-aliasing and post-processing mod.",
 	"settings": {
 		"aa-title": {
 			"type": "title",
@@ -52,6 +52,30 @@
 		"fun-title": {
 			"type": "title",
 			"name": "Fun"
+		},
+		"bloom-enabled": {
+			"type": "bool",
+			"name": "Bloom",
+			"description": "Apply a mild bloom glow.",
+			"default": false
+		},
+		"grayscale-enabled": {
+			"type": "bool",
+			"name": "Grayscale",
+			"description": "Convert the display to grayscale.",
+			"default": false
+		},
+		"pixelate-enabled": {
+			"type": "bool",
+			"name": "Pixelate",
+			"description": "Apply a 4-pixel block effect.",
+			"default": false
+		},
+		"dithering-enabled": {
+			"type": "bool",
+			"name": "Dithering Filter",
+			"description": "Apply 8x8 ordered color dithering.",
+			"default": false
 		},
 		"vhs-enabled": {
 			"type": "bool",
