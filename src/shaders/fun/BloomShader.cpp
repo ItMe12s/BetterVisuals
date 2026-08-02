@@ -7,7 +7,7 @@
 
 namespace bv::shaders::bloom {
 
-    constexpr char kVertexSource[] = R"glsl(#version 120
+    constexpr char kVertexSource[] = R"glsl(
 attribute vec2 a_position;
 attribute vec2 a_texCoord;
 varying vec2 v_texCoord;
@@ -18,7 +18,7 @@ void main() {
 }
 )glsl";
 
-    constexpr char kPrefilterSource[] = R"glsl(#version 120
+    constexpr char kPrefilterSource[] = R"glsl(
 uniform sampler2D u_texture;
 uniform vec2 u_invResolution;
 
@@ -43,7 +43,7 @@ void main() {
 }
 )glsl";
 
-    constexpr char kBlurSource[] = R"glsl(#version 120
+    constexpr char kBlurSource[] = R"glsl(
 uniform sampler2D u_texture;
 uniform vec2 u_texelStep;
 varying vec2 v_texCoord;
@@ -60,7 +60,7 @@ void main() {
 }
 )glsl";
 
-    constexpr char kCompositeSource[] = R"glsl(#version 120
+    constexpr char kCompositeSource[] = R"glsl(
 uniform sampler2D u_source;
 uniform sampler2D u_bloom;
 varying vec2 v_texCoord;

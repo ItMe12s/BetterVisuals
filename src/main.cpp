@@ -13,7 +13,12 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCEGLView.hpp>
+#include <Geode/platform/cplatform.h>
+#ifdef GEODE_IS_MOBILE
+    #include <Geode/modify/AppDelegate.hpp>
+#endif
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -39,6 +44,7 @@ namespace {
     std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
+    bv::render::CaptureTexture g_captureTexture;
     bv::render::PostProcessRenderer g_postProcessRenderer;
     bv::render::PostProcessRenderer g_casRenderer;
     bv::render::BloomRenderer g_bloomRenderer;
@@ -48,6 +54,27 @@ namespace {
     bv::render::PostProcessRenderer g_vhsRenderer;
     bv::render::PostProcessRenderer g_crtRenderer;
     bv::render::SmaaRenderer g_smaaRenderer;
+    bool g_pipelineFailed = false;
+
+    void resetRenderResources() {
+        g_captureTexture.reset();
+        g_postProcessRenderer.reset();
+        g_casRenderer.reset();
+        g_bloomRenderer.reset();
+        g_grayscaleRenderer.reset();
+        g_pixelateRenderer.reset();
+        g_ditheringRenderer.reset();
+        g_vhsRenderer.reset();
+        g_crtRenderer.reset();
+        g_smaaRenderer.reset();
+        g_pipelineFailed = false;
+    }
+
+    void disableRenderPipeline() {
+        resetRenderResources();
+        g_pipelineFailed = true;
+        log::error("BetterVisuals rendering disabled for the current OpenGL context");
+    }
 
     void updateAntiAliasingMode(std::string_view value) {
         if (value == "SMAA High") {
@@ -188,62 +215,154 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
             renderedCrtEnabled = crtEnabled;
         }
 
+        auto const usesSharedCapture = selectedMode == AntiAliasingMode::Fxaa || casEnabled ||
+            grayscaleEnabled || pixelateEnabled || ditheringEnabled || vhsEnabled || crtEnabled;
+        if (!usesSharedCapture) {
+            g_captureTexture.reset();
+        }
+        if (g_pipelineFailed) {
+            CCEGLView::swapBuffers();
+            return;
+        }
+
+        auto const hasEffects = selectedMode != AntiAliasingMode::Off || casEnabled || bloomEnabled ||
+            grayscaleEnabled || pixelateEnabled || ditheringEnabled || vhsEnabled || crtEnabled;
+        if (!hasEffects) {
+            CCEGLView::swapBuffers();
+            return;
+        }
+
+        std::array<GLint, 4> viewport{};
+        glGetIntegerv(GL_VIEWPORT, viewport.data());
+        auto const width = static_cast<GLsizei>(viewport[2]);
+        auto const height = static_cast<GLsizei>(viewport[3]);
+        if (width <= 0 || height <= 0) {
+            CCEGLView::swapBuffers();
+            return;
+        }
+
+        bool renderSucceeded = true;
         switch (selectedMode) {
             case AntiAliasingMode::Fxaa:
-                g_postProcessRenderer.apply(bv::shaders::kFxaaShader);
+                renderSucceeded = g_postProcessRenderer.prepare(
+                    g_captureTexture, bv::shaders::kFxaaShader, width, height
+                );
                 break;
 
             case AntiAliasingMode::SmaaHigh:
-                g_smaaRenderer.apply(bv::shaders::kSmaaHighShaderSet);
+                renderSucceeded =
+                    g_smaaRenderer.prepare(bv::shaders::kSmaaHighShaderSet, width, height);
                 break;
 
             case AntiAliasingMode::SmaaUltra:
-                g_smaaRenderer.apply(bv::shaders::kSmaaUltraShaderSet);
+                renderSucceeded =
+                    g_smaaRenderer.prepare(bv::shaders::kSmaaUltraShaderSet, width, height);
+                break;
+
+            case AntiAliasingMode::Off: break;
+        }
+        if (renderSucceeded && casEnabled) {
+            renderSucceeded =
+                g_casRenderer.prepare(g_captureTexture, bv::shaders::kCasShader, width, height);
+        }
+        if (renderSucceeded && bloomEnabled) {
+            renderSucceeded = g_bloomRenderer.prepare(width, height);
+        }
+        if (renderSucceeded && grayscaleEnabled) {
+            renderSucceeded = g_grayscaleRenderer.prepare(
+                g_captureTexture, bv::shaders::kGrayscaleShader, width, height
+            );
+        }
+        if (renderSucceeded && pixelateEnabled) {
+            renderSucceeded = g_pixelateRenderer.prepare(
+                g_captureTexture, bv::shaders::kPixelateShader, width, height
+            );
+        }
+        if (renderSucceeded && ditheringEnabled) {
+            renderSucceeded = g_ditheringRenderer.prepare(
+                g_captureTexture, bv::shaders::kDitheringShader, width, height
+            );
+        }
+        if (renderSucceeded && vhsEnabled) {
+            renderSucceeded =
+                g_vhsRenderer.prepare(g_captureTexture, bv::shaders::kVhsShader, width, height);
+        }
+        if (renderSucceeded && crtEnabled) {
+            renderSucceeded =
+                g_crtRenderer.prepare(g_captureTexture, bv::shaders::kCrtShader, width, height);
+        }
+        if (!renderSucceeded) {
+            disableRenderPipeline();
+            CCEGLView::swapBuffers();
+            return;
+        }
+
+        switch (selectedMode) {
+            case AntiAliasingMode::Fxaa:
+                renderSucceeded =
+                    g_postProcessRenderer.apply(g_captureTexture, bv::shaders::kFxaaShader);
+                break;
+
+            case AntiAliasingMode::SmaaHigh:
+                renderSucceeded = g_smaaRenderer.apply(bv::shaders::kSmaaHighShaderSet);
+                break;
+
+            case AntiAliasingMode::SmaaUltra:
+                renderSucceeded = g_smaaRenderer.apply(bv::shaders::kSmaaUltraShaderSet);
                 break;
 
             case AntiAliasingMode::Off: break;
         }
 
-        if (casEnabled) {
-            g_casRenderer.apply(
-                bv::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
+        if (renderSucceeded && casEnabled) {
+            renderSucceeded = g_casRenderer.apply(
+                g_captureTexture, bv::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
             );
         }
-        if (bloomEnabled) {
-            g_bloomRenderer.apply();
+        if (renderSucceeded && bloomEnabled) {
+            renderSucceeded = g_bloomRenderer.apply();
         }
-        if (grayscaleEnabled) {
-            g_grayscaleRenderer.apply(bv::shaders::kGrayscaleShader);
+        if (renderSucceeded && grayscaleEnabled) {
+            renderSucceeded =
+                g_grayscaleRenderer.apply(g_captureTexture, bv::shaders::kGrayscaleShader);
         }
-        if (pixelateEnabled) {
-            g_pixelateRenderer.apply(bv::shaders::kPixelateShader);
+        if (renderSucceeded && pixelateEnabled) {
+            renderSucceeded =
+                g_pixelateRenderer.apply(g_captureTexture, bv::shaders::kPixelateShader);
         }
-        if (ditheringEnabled) {
-            g_ditheringRenderer.apply(bv::shaders::kDitheringShader);
+        if (renderSucceeded && ditheringEnabled) {
+            renderSucceeded =
+                g_ditheringRenderer.apply(g_captureTexture, bv::shaders::kDitheringShader);
         }
-        if (vhsEnabled) {
+        if (renderSucceeded && vhsEnabled) {
             static auto const clockStart = std::chrono::steady_clock::now();
             auto const elapsed =
                 std::chrono::duration<GLfloat>(std::chrono::steady_clock::now() - clockStart).count();
-            g_vhsRenderer.apply(bv::shaders::kVhsShader, elapsed);
+            renderSucceeded = g_vhsRenderer.apply(g_captureTexture, bv::shaders::kVhsShader, elapsed);
         }
-        if (crtEnabled) {
-            g_crtRenderer.apply(bv::shaders::kCrtShader);
+        if (renderSucceeded && crtEnabled) {
+            renderSucceeded = g_crtRenderer.apply(g_captureTexture, bv::shaders::kCrtShader);
+        }
+        if (!renderSucceeded) {
+            disableRenderPipeline();
         }
 
         CCEGLView::swapBuffers();
     }
 
+#ifdef GEODE_IS_WINDOWS
     void toggleFullScreen(bool value, bool borderless, bool fix) {
-        g_postProcessRenderer.reset();
-        g_casRenderer.reset();
-        g_bloomRenderer.reset();
-        g_grayscaleRenderer.reset();
-        g_pixelateRenderer.reset();
-        g_ditheringRenderer.reset();
-        g_vhsRenderer.reset();
-        g_crtRenderer.reset();
-        g_smaaRenderer.reset();
+        resetRenderResources();
         CCEGLView::toggleFullScreen(value, borderless, fix);
     }
+#endif
 };
+
+#ifdef GEODE_IS_MOBILE
+class $modify(BetterVisualsAppDelegate, AppDelegate) {
+    void applicationDidEnterBackground() {
+        resetRenderResources();
+        AppDelegate::applicationDidEnterBackground();
+    }
+};
+#endif

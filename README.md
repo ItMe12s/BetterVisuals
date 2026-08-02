@@ -1,6 +1,6 @@
 # BetterVisuals
 
-**Also known as:** Anti-aliasing Mod, Less Jagged Edges, Super Secret Settings.
+**Also known as:** Less Jagged Edges, Super Secret Settings.
 
 Makes the game look better while playing levels.
 
@@ -36,3 +36,5 @@ Extra shaders you can mix and match:
 ## Want more AA methods and shaders?
 
 Join the Discord server or make a GitHub issue/feature request!
+
+Credits, citations, and licenses are available in the mod's source code.

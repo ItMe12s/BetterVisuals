@@ -36,12 +36,7 @@ namespace bv::render {
         GLboolean stencilTest = GL_FALSE;
         GLboolean scissorTest = GL_FALSE;
         GLboolean cullFace = GL_FALSE;
-        GLboolean framebufferSrgb = GL_FALSE;
-        bool framebufferSupported = false;
-        bool separateFramebufferBindings = false;
-        bool framebufferSrgbSupported = false;
-        GLint readFramebuffer = 0;
-        GLint drawFramebuffer = 0;
+        GLint framebuffer = 0;
         std::array<VertexAttributeState, 2> attributes = {};
 
         bool operator==(GlState const&) const = default;
@@ -59,8 +54,7 @@ namespace bv::render {
         GlStateGuard& operator=(GlStateGuard const&) = delete;
 
         std::array<GLint, 4> const& viewport() const;
-        void bindOriginalReadFramebuffer() const;
-        void bindOriginalDrawFramebuffer() const;
+        void bindOriginalFramebuffer() const;
 
     private:
         GlState m_state;

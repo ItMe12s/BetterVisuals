@@ -20,17 +20,38 @@ namespace {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 
-    bool textureHasSize(GLsizei width, GLsizei height) {
-        GLint allocatedWidth = 0;
-        GLint allocatedHeight = 0;
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &allocatedWidth);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &allocatedHeight);
-        return allocatedWidth == width && allocatedHeight == height;
+    void clearGlErrors() {
+        while (glGetError() != GL_NO_ERROR) {}
+    }
+
+    bool uploadTexture(
+        GLint internalFormat, GLsizei width, GLsizei height, GLenum format, void const* data
+    ) {
+        clearGlErrors();
+        glTexImage2D(
+            GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data
+        );
+        return glGetError() == GL_NO_ERROR;
     }
 
 } // namespace
 
 namespace bv::render {
+
+    bool SmaaRenderer::isReady(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height) const {
+        return !m_failed && m_shaders == &shaders && m_programs[0].handle != 0 &&
+            m_width == width && m_height == height;
+    }
+
+    bool SmaaRenderer::prepare(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height) {
+        if (isReady(shaders, width, height)) {
+            return true;
+        }
+
+        GlStateGuard state{GlStateProfile::Multipass};
+        glActiveTexture(GL_TEXTURE0);
+        return initialize(shaders) && resizeTextures(width, height);
+    }
 
     bool SmaaRenderer::initialize(shaders::SmaaShaderSet const& shaders) {
         if (m_shaders != &shaders) {
@@ -45,24 +66,15 @@ namespace bv::render {
             return true;
         }
 
-        m_coreFramebufferApi = GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object;
-        if (!m_coreFramebufferApi && !GLEW_EXT_framebuffer_object) {
-            log::error("SMAA requires framebuffer object support");
-            m_failed = true;
-            return false;
-        }
-
         for (std::size_t index = 0; index < m_programs.size(); ++index) {
             auto const& source = shaders.programs[index];
             std::array vertexSources{
-                shaders.versionSource,
                 shaders.commonSource,
                 shaders.vertexStageSource,
                 shaders.algorithmSource,
                 source.vertexMain,
             };
             std::array fragmentSources{
-                shaders.versionSource,
                 shaders.commonSource,
                 shaders.fragmentStageSource,
                 shaders.algorithmSource,
@@ -121,12 +133,7 @@ namespace bv::render {
         for (std::size_t index = 0; index < textures.size(); ++index) {
             *textureHandles[index] = textures[index];
         }
-        if (m_coreFramebufferApi) {
-            glGenFramebuffers(1, &m_framebuffer);
-        }
-        else {
-            glGenFramebuffersEXT(1, &m_framebuffer);
-        }
+        glGenFramebuffers(1, &m_framebuffer);
         if (m_sourceTexture == 0 || m_edgeTexture == 0 || m_weightTexture == 0 ||
             m_areaTexture == 0 || m_searchTexture == 0 || m_framebuffer == 0) {
             log::error("Unable to allocate SMAA OpenGL objects");
@@ -145,20 +152,12 @@ namespace bv::render {
         }
 
         glBindTexture(GL_TEXTURE_2D, m_areaTexture);
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_LUMINANCE8_ALPHA8,
-            static_cast<GLsizei>(shaders::smaa::kAreaTextureWidth),
-            static_cast<GLsizei>(shaders::smaa::kAreaTextureHeight),
-            0,
-            GL_LUMINANCE_ALPHA,
-            GL_UNSIGNED_BYTE,
-            shaders::smaa::kAreaTextureBytes.data()
-        );
-        if (!textureHasSize(
+        if (!uploadTexture(
+                GL_LUMINANCE_ALPHA,
                 static_cast<GLsizei>(shaders::smaa::kAreaTextureWidth),
-                static_cast<GLsizei>(shaders::smaa::kAreaTextureHeight)
+                static_cast<GLsizei>(shaders::smaa::kAreaTextureHeight),
+                GL_LUMINANCE_ALPHA,
+                shaders::smaa::kAreaTextureBytes.data()
             )) {
             log::error("Unable to upload the SMAA area lookup texture");
             destroyResources();
@@ -167,20 +166,12 @@ namespace bv::render {
         }
 
         glBindTexture(GL_TEXTURE_2D, m_searchTexture);
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_LUMINANCE8,
-            static_cast<GLsizei>(shaders::smaa::kSearchTextureWidth),
-            static_cast<GLsizei>(shaders::smaa::kSearchTextureHeight),
-            0,
-            GL_LUMINANCE,
-            GL_UNSIGNED_BYTE,
-            shaders::smaa::kSearchTextureBytes.data()
-        );
-        if (!textureHasSize(
+        if (!uploadTexture(
+                GL_LUMINANCE,
                 static_cast<GLsizei>(shaders::smaa::kSearchTextureWidth),
-                static_cast<GLsizei>(shaders::smaa::kSearchTextureHeight)
+                static_cast<GLsizei>(shaders::smaa::kSearchTextureHeight),
+                GL_LUMINANCE,
+                shaders::smaa::kSearchTextureBytes.data()
             )) {
             log::error("Unable to upload the SMAA search lookup texture");
             destroyResources();
@@ -198,10 +189,7 @@ namespace bv::render {
 
         for (auto texture : {m_sourceTexture, m_edgeTexture, m_weightTexture}) {
             glBindTexture(GL_TEXTURE_2D, texture);
-            glTexImage2D(
-                GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr
-            );
-            if (!textureHasSize(width, height)) {
+            if (!uploadTexture(GL_RGBA, width, height, GL_RGBA, nullptr)) {
                 log::error("Unable to allocate a {}x{} SMAA framebuffer texture", width, height);
                 destroyResources();
                 m_failed = true;
@@ -235,36 +223,20 @@ namespace bv::render {
     bool SmaaRenderer::validateFramebuffer(GLuint texture) {
         bindIntermediateFramebuffer();
         attachIntermediateTexture(texture);
-        auto const status = m_coreFramebufferApi ? glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) :
-                                                   glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-        return status == GL_FRAMEBUFFER_COMPLETE;
+        return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     }
 
     void SmaaRenderer::bindIntermediateFramebuffer() {
-        if (m_coreFramebufferApi) {
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
-        }
-        else {
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_framebuffer);
-        }
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     }
 
     void SmaaRenderer::attachIntermediateTexture(GLuint texture) {
-        if (m_coreFramebufferApi) {
-            glFramebufferTexture2D(
-                GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0
-            );
-        }
-        else {
-            glFramebufferTexture2DEXT(
-                GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, texture, 0
-            );
-        }
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     }
 
-    void SmaaRenderer::apply(shaders::SmaaShaderSet const& shaders) {
+    bool SmaaRenderer::apply(shaders::SmaaShaderSet const& shaders) {
         if (m_failed && m_shaders == &shaders) {
-            return;
+            return false;
         }
 
         GlStateGuard state{GlStateProfile::Multipass};
@@ -273,13 +245,13 @@ namespace bv::render {
         auto const width = static_cast<GLsizei>(viewport[2]);
         auto const height = static_cast<GLsizei>(viewport[3]);
         if (width <= 0 || height <= 0) {
-            return;
+            return true;
         }
         if (!initialize(shaders) || !resizeTextures(width, height)) {
-            return;
+            return false;
         }
 
-        state.bindOriginalReadFramebuffer();
+        state.bindOriginalFramebuffer();
         glBindTexture(GL_TEXTURE_2D, m_sourceTexture);
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, viewport[0], viewport[1], width, height);
 
@@ -288,9 +260,6 @@ namespace bv::render {
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_CULL_FACE);
-        if (GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_sRGB || GLEW_EXT_framebuffer_sRGB) {
-            glDisable(GL_FRAMEBUFFER_SRGB);
-        }
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glClearColor(0.f, 0.f, 0.f, 0.f);
         glViewport(0, 0, width, height);
@@ -311,7 +280,7 @@ namespace bv::render {
         glBindTexture(GL_TEXTURE_2D, m_searchTexture);
         m_quad.draw();
 
-        state.bindOriginalDrawFramebuffer();
+        state.bindOriginalFramebuffer();
         glViewport(viewport[0], viewport[1], width, height);
         glUseProgram(m_programs[2].handle);
         glActiveTexture(GL_TEXTURE0);
@@ -319,6 +288,7 @@ namespace bv::render {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_weightTexture);
         m_quad.draw();
+        return true;
     }
 
     void SmaaRenderer::reset() {
@@ -330,12 +300,7 @@ namespace bv::render {
     void SmaaRenderer::destroyResources() {
         m_quad.reset();
         if (m_framebuffer != 0) {
-            if (m_coreFramebufferApi) {
-                glDeleteFramebuffers(1, &m_framebuffer);
-            }
-            else {
-                glDeleteFramebuffersEXT(1, &m_framebuffer);
-            }
+            glDeleteFramebuffers(1, &m_framebuffer);
             m_framebuffer = 0;
         }
 
@@ -361,7 +326,6 @@ namespace bv::render {
         }
         m_width = 0;
         m_height = 0;
-        m_coreFramebufferApi = false;
     }
 
 } // namespace bv::render

@@ -1,7 +1,7 @@
 #include "SmaaShader.hpp"
 
 /*
- * SMAA 1x High and Ultra GLSL 1.20 port.
+ * SMAA 1x High and Ultra GLSL 1.20 / GLSL ES 1.00 port.
  *
  * Algorithm and reference implementation:
  * https://www.iryoku.com/smaa/downloads/SMAA-Enhanced-Subpixel-Morphological-Antialiasing.pdf
@@ -16,9 +16,6 @@
  */
 
 namespace bv::shaders::smaa {
-
-    constexpr char kVersionSource[] = R"glsl(#version 120
-)glsl";
 
     constexpr char kHighCommonSource[] = R"glsl(
 uniform vec4 u_metrics;
@@ -696,7 +693,7 @@ vec3 smaaLinearToSrgb(vec3 color) {
 }
 void main() {
     /*
-     * The GL_RGBA8 copy contains display-encoded values without automatic
+     * The RGBA copy contains display-encoded values without automatic
      * sRGB decoding. Edge detection reads them directly; only blended pixels
      * are decoded to linear light and encoded once after blending.
      */
@@ -737,7 +734,6 @@ void main() {
     }};
 
     constexpr ShaderSet kSmaaHighShaderSet{
-        kVersionSource,
         kHighCommonSource,
         kVertexStageSource,
         kFragmentStageSource,
@@ -746,7 +742,6 @@ void main() {
     };
 
     constexpr ShaderSet kSmaaUltraShaderSet{
-        kVersionSource,
         kUltraCommonSource,
         kVertexStageSource,
         kFragmentStageSource,

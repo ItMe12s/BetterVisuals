@@ -12,7 +12,6 @@ namespace bv::shaders::smaa {
     };
 
     struct ShaderSet {
-        std::string_view versionSource;
         std::string_view commonSource;
         std::string_view vertexStageSource;
         std::string_view fragmentStageSource;

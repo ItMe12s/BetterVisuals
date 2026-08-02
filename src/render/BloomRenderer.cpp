@@ -26,18 +26,28 @@ namespace {
 
     bool allocateTexture(GLuint texture, GLsizei width, GLsizei height) {
         glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-        GLint allocatedWidth = 0;
-        GLint allocatedHeight = 0;
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &allocatedWidth);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &allocatedHeight);
-        return allocatedWidth == width && allocatedHeight == height;
+        while (glGetError() != GL_NO_ERROR) {}
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        return glGetError() == GL_NO_ERROR;
     }
 
 } // namespace
 
 namespace bv::render {
+
+    bool BloomRenderer::isReady(GLsizei width, GLsizei height) const {
+        return !m_failed && m_programs[0].handle != 0 && m_width == width && m_height == height;
+    }
+
+    bool BloomRenderer::prepare(GLsizei width, GLsizei height) {
+        if (isReady(width, height)) {
+            return true;
+        }
+
+        GlStateGuard state{GlStateProfile::Multipass};
+        glActiveTexture(GL_TEXTURE0);
+        return initialize() && resizeTextures(width, height);
+    }
 
     bool BloomRenderer::initialize() {
         if (m_failed) {
@@ -45,13 +55,6 @@ namespace bv::render {
         }
         if (m_programs[0].handle != 0) {
             return true;
-        }
-
-        m_coreFramebufferApi = GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object;
-        if (!m_coreFramebufferApi && !GLEW_EXT_framebuffer_object) {
-            log::error("Bloom requires framebuffer object support");
-            m_failed = true;
-            return false;
         }
 
         auto const& shaderSet = shaders::kBloomShaderSet;
@@ -111,12 +114,7 @@ namespace bv::render {
         m_prefilterTexture = textures[1];
         m_horizontalTexture = textures[2];
         m_verticalTexture = textures[3];
-        if (m_coreFramebufferApi) {
-            glGenFramebuffers(1, &m_framebuffer);
-        }
-        else {
-            glGenFramebuffersEXT(1, &m_framebuffer);
-        }
+        glGenFramebuffers(1, &m_framebuffer);
         if (m_sourceTexture == 0 || m_prefilterTexture == 0 || m_horizontalTexture == 0 ||
             m_verticalTexture == 0 || m_framebuffer == 0) {
             log::error("Unable to allocate bloom OpenGL objects");
@@ -180,36 +178,20 @@ namespace bv::render {
     bool BloomRenderer::validateFramebuffer(GLuint texture) {
         bindIntermediateFramebuffer();
         attachIntermediateTexture(texture);
-        auto const status = m_coreFramebufferApi ? glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) :
-                                                   glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-        return status == GL_FRAMEBUFFER_COMPLETE;
+        return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     }
 
     void BloomRenderer::bindIntermediateFramebuffer() {
-        if (m_coreFramebufferApi) {
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_framebuffer);
-        }
-        else {
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_framebuffer);
-        }
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     }
 
     void BloomRenderer::attachIntermediateTexture(GLuint texture) {
-        if (m_coreFramebufferApi) {
-            glFramebufferTexture2D(
-                GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0
-            );
-        }
-        else {
-            glFramebufferTexture2DEXT(
-                GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, texture, 0
-            );
-        }
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     }
 
-    void BloomRenderer::apply() {
+    bool BloomRenderer::apply() {
         if (m_failed) {
-            return;
+            return false;
         }
 
         GlStateGuard state{GlStateProfile::Multipass};
@@ -218,13 +200,13 @@ namespace bv::render {
         auto const width = static_cast<GLsizei>(viewport[2]);
         auto const height = static_cast<GLsizei>(viewport[3]);
         if (width <= 0 || height <= 0) {
-            return;
+            return true;
         }
         if (!initialize() || !resizeTextures(width, height)) {
-            return;
+            return false;
         }
 
-        state.bindOriginalReadFramebuffer();
+        state.bindOriginalFramebuffer();
         glBindTexture(GL_TEXTURE_2D, m_sourceTexture);
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, viewport[0], viewport[1], width, height);
 
@@ -233,9 +215,6 @@ namespace bv::render {
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_CULL_FACE);
-        if (GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_sRGB || GLEW_EXT_framebuffer_sRGB) {
-            glDisable(GL_FRAMEBUFFER_SRGB);
-        }
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glViewport(0, 0, m_halfWidth, m_halfHeight);
         m_quad.bind();
@@ -257,7 +236,7 @@ namespace bv::render {
         glBindTexture(GL_TEXTURE_2D, m_horizontalTexture);
         m_quad.draw();
 
-        state.bindOriginalDrawFramebuffer();
+        state.bindOriginalFramebuffer();
         glViewport(viewport[0], viewport[1], width, height);
         glUseProgram(m_programs[2].handle);
         glActiveTexture(GL_TEXTURE0);
@@ -265,6 +244,7 @@ namespace bv::render {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_verticalTexture);
         m_quad.draw();
+        return true;
     }
 
     void BloomRenderer::reset() {
@@ -275,12 +255,7 @@ namespace bv::render {
     void BloomRenderer::destroyResources() {
         m_quad.reset();
         if (m_framebuffer != 0) {
-            if (m_coreFramebufferApi) {
-                glDeleteFramebuffers(1, &m_framebuffer);
-            }
-            else {
-                glDeleteFramebuffersEXT(1, &m_framebuffer);
-            }
+            glDeleteFramebuffers(1, &m_framebuffer);
             m_framebuffer = 0;
         }
 
@@ -308,7 +283,6 @@ namespace bv::render {
         m_halfHeight = 0;
         m_blurStepX = 0.f;
         m_blurStepY = 0.f;
-        m_coreFramebufferApi = false;
     }
 
 } // namespace bv::render

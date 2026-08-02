@@ -11,6 +11,15 @@ using namespace geode::prelude;
 
 namespace {
 
+#ifdef GEODE_IS_MOBILE
+    constexpr std::string_view kShaderPrelude =
+        "#version 100\n"
+        "precision highp float;\n"
+        "precision highp int;\n";
+#else
+    constexpr std::string_view kShaderPrelude = "#version 120\n";
+#endif
+
     std::string shaderLog(GLuint shader) {
         GLint length = 0;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
@@ -46,8 +55,10 @@ namespace {
 
         std::vector<GLchar const*> sourceData;
         std::vector<GLint> sourceLengths;
-        sourceData.reserve(sources.size());
-        sourceLengths.reserve(sources.size());
+        sourceData.reserve(sources.size() + 1);
+        sourceLengths.reserve(sources.size() + 1);
+        sourceData.push_back(kShaderPrelude.data());
+        sourceLengths.push_back(static_cast<GLint>(kShaderPrelude.size()));
         for (auto const& source : sources) {
             sourceData.push_back(source.data());
             sourceLengths.push_back(static_cast<GLint>(source.size()));

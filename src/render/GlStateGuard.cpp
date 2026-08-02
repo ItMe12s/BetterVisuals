@@ -77,23 +77,7 @@ namespace bv::render {
         state.cullFace = glIsEnabled(GL_CULL_FACE);
 
         if (profile == GlStateProfile::Multipass) {
-            state.separateFramebufferBindings = GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_object;
-            state.framebufferSupported =
-                state.separateFramebufferBindings || GLEW_EXT_framebuffer_object;
-            if (state.separateFramebufferBindings) {
-                glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &state.readFramebuffer);
-                glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &state.drawFramebuffer);
-            }
-            else if (state.framebufferSupported) {
-                glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &state.drawFramebuffer);
-                state.readFramebuffer = state.drawFramebuffer;
-            }
-        }
-
-        state.framebufferSrgbSupported =
-            GLEW_VERSION_3_0 || GLEW_ARB_framebuffer_sRGB || GLEW_EXT_framebuffer_sRGB;
-        if (state.framebufferSrgbSupported) {
-            state.framebufferSrgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &state.framebuffer);
         }
 
         state.attributes[0] = captureVertexAttribute(FullscreenQuad::kPositionAttribute);
@@ -116,14 +100,7 @@ namespace bv::render {
         glUseProgram(state.program);
 
         if (state.profile == GlStateProfile::Multipass) {
-            if (state.separateFramebufferBindings) {
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, state.readFramebuffer);
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, state.drawFramebuffer);
-            }
-            else if (state.framebufferSupported) {
-                glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, state.drawFramebuffer);
-            }
-
+            glBindFramebuffer(GL_FRAMEBUFFER, state.framebuffer);
             glViewport(state.viewport[0], state.viewport[1], state.viewport[2], state.viewport[3]);
             glClearColor(
                 state.clearColor[0], state.clearColor[1], state.clearColor[2], state.clearColor[3]
@@ -135,9 +112,6 @@ namespace bv::render {
         restoreCapability(GL_STENCIL_TEST, state.stencilTest);
         restoreCapability(GL_SCISSOR_TEST, state.scissorTest);
         restoreCapability(GL_CULL_FACE, state.cullFace);
-        if (state.framebufferSrgbSupported) {
-            restoreCapability(GL_FRAMEBUFFER_SRGB, state.framebufferSrgb);
-        }
     }
 
     GlStateGuard::GlStateGuard(GlStateProfile profile) : m_state(captureGlState(profile)) {}
@@ -154,24 +128,9 @@ namespace bv::render {
         return m_state.viewport;
     }
 
-    void GlStateGuard::bindOriginalReadFramebuffer() const {
+    void GlStateGuard::bindOriginalFramebuffer() const {
         assert(m_state.profile == GlStateProfile::Multipass);
-        if (m_state.separateFramebufferBindings) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, m_state.readFramebuffer);
-        }
-        else if (m_state.framebufferSupported) {
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_state.readFramebuffer);
-        }
-    }
-
-    void GlStateGuard::bindOriginalDrawFramebuffer() const {
-        assert(m_state.profile == GlStateProfile::Multipass);
-        if (m_state.separateFramebufferBindings) {
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_state.drawFramebuffer);
-        }
-        else if (m_state.framebufferSupported) {
-            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_state.drawFramebuffer);
-        }
+        glBindFramebuffer(GL_FRAMEBUFFER, m_state.framebuffer);
     }
 
 } // namespace bv::render

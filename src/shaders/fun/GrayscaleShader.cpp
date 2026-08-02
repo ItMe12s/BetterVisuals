@@ -4,7 +4,7 @@
 
 namespace bv::shaders::grayscale {
 
-    constexpr char kVertexSource[] = R"glsl(#version 120
+    constexpr char kVertexSource[] = R"glsl(
 attribute vec2 a_position;
 attribute vec2 a_texCoord;
 varying vec2 v_texCoord;
@@ -15,7 +15,7 @@ void main() {
 }
 )glsl";
 
-    constexpr char kFragmentSource[] = R"glsl(#version 120
+    constexpr char kFragmentSource[] = R"glsl(
 uniform sampler2D u_texture;
 uniform vec2 u_invResolution;
 varying vec2 v_texCoord;

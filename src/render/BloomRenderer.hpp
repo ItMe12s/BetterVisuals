@@ -13,10 +13,13 @@ namespace bv::render {
         BloomRenderer(BloomRenderer const&) = delete;
         BloomRenderer& operator=(BloomRenderer const&) = delete;
 
-        void apply();
+        bool prepare(GLsizei width, GLsizei height);
+        bool apply();
         void reset();
 
     private:
+        bool isReady(GLsizei width, GLsizei height) const;
+
         struct Program {
             GLuint handle = 0;
             std::array<GLint, 2> textures = {-1, -1};
@@ -43,7 +46,6 @@ namespace bv::render {
         GLsizei m_halfHeight = 0;
         GLfloat m_blurStepX = 0.f;
         GLfloat m_blurStepY = 0.f;
-        bool m_coreFramebufferApi = false;
         bool m_failed = false;
     };
 

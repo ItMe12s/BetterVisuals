@@ -14,10 +14,13 @@ namespace bv::render {
         SmaaRenderer(SmaaRenderer const&) = delete;
         SmaaRenderer& operator=(SmaaRenderer const&) = delete;
 
-        void apply(shaders::SmaaShaderSet const& shaders);
+        bool prepare(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height);
+        bool apply(shaders::SmaaShaderSet const& shaders);
         void reset();
 
     private:
+        bool isReady(shaders::SmaaShaderSet const& shaders, GLsizei width, GLsizei height) const;
+
         struct Program {
             GLuint handle = 0;
             GLint metrics = -1;
@@ -42,7 +45,6 @@ namespace bv::render {
         FullscreenQuad m_quad;
         GLsizei m_width = 0;
         GLsizei m_height = 0;
-        bool m_coreFramebufferApi = false;
         bool m_failed = false;
     };
 
