@@ -3,7 +3,7 @@
 #include <Geode/cocos/platform/CCGL.h>
 #include <string_view>
 
-namespace aa::render {
+namespace bv::render {
 
     class FullscreenQuad final {
     public:
@@ -25,4 +25,4 @@ namespace aa::render {
         GLuint m_vbo = 0;
     };
 
-} // namespace aa::render
+} // namespace bv::render

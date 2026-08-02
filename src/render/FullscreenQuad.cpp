@@ -22,7 +22,7 @@ namespace {
 
 } // namespace
 
-namespace aa::render {
+namespace bv::render {
 
     bool FullscreenQuad::initialize(std::string_view label) {
         if (m_vbo != 0) {
@@ -84,4 +84,4 @@ namespace aa::render {
         }
     }
 
-} // namespace aa::render
+} // namespace bv::render

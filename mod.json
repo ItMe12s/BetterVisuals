@@ -3,8 +3,8 @@
 	"gd": {
 		"win": "2.2081"
 	},
-	"id": "imes.aa-mod",
-	"name": "Anti-aliasing Mod",
+	"id": "imes.bettervisuals",
+	"name": "BetterVisuals",
 	"version": "v1.0.0",
 	"developer": "imes",
 	"description": "Neat anti-aliasing and post-processing mod.",
@@ -16,7 +16,7 @@
 		"aa-mode": {
 			"type": "string",
 			"name": "AA Mode",
-			"description": "Fullscreen (game window) anti-aliasing mode.",
+			"description": "Fullscreen (whole game window) anti-aliasing mode.",
 			"default": "SMAA High",
 			"one-of": [
 				"Off",

@@ -30,7 +30,7 @@ namespace {
 
 } // namespace
 
-namespace aa::render {
+namespace bv::render {
 
     bool SmaaRenderer::initialize(shaders::SmaaShaderSet const& shaders) {
         if (m_shaders != &shaders) {
@@ -364,4 +364,4 @@ namespace aa::render {
         m_coreFramebufferApi = false;
     }
 
-} // namespace aa::render
+} // namespace bv::render

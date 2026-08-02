@@ -3,7 +3,7 @@
 #include <array>
 #include <string_view>
 
-namespace aa::shaders::smaa {
+namespace bv::shaders::smaa {
 
     struct ProgramSource {
         std::string_view name;
@@ -20,12 +20,12 @@ namespace aa::shaders::smaa {
         std::array<ProgramSource, 3> programs;
     };
 
-} // namespace aa::shaders::smaa
+} // namespace bv::shaders::smaa
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     using SmaaShaderSet = smaa::ShaderSet;
     extern SmaaShaderSet const kSmaaHighShaderSet;
     extern SmaaShaderSet const kSmaaUltraShaderSet;
 
-} // namespace aa::shaders
+} // namespace bv::shaders

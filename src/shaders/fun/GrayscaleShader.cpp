@@ -2,7 +2,7 @@
 
 #include "../../render/PostProcessRenderer.hpp"
 
-namespace aa::shaders::grayscale {
+namespace bv::shaders::grayscale {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -28,9 +28,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::grayscale
+} // namespace bv::shaders::grayscale
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kGrayscaleShader{
         "Grayscale",
@@ -38,4 +38,4 @@ namespace aa::shaders {
         grayscale::kFragmentSource,
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

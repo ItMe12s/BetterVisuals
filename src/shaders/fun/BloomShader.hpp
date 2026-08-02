@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     struct BloomShaderSet {
         std::string_view vertexSource;
@@ -13,4 +13,4 @@ namespace aa::shaders {
 
     extern BloomShaderSet const kBloomShaderSet;
 
-} // namespace aa::shaders
+} // namespace bv::shaders

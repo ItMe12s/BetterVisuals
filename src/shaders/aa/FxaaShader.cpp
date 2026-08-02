@@ -12,7 +12,7 @@
  * https://github.com/libretro/glsl-shaders/blob/master/anti-aliasing/shaders/fxaa.glsl
  */
 
-namespace aa::shaders::fxaa {
+namespace bv::shaders::fxaa {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -207,9 +207,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::fxaa
+} // namespace bv::shaders::fxaa
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kFxaaShader{
         "FXAA",
@@ -217,4 +217,4 @@ namespace aa::shaders {
         fxaa::kFragmentSource,
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

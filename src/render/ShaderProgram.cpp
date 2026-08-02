@@ -69,7 +69,7 @@ namespace {
 
 } // namespace
 
-namespace aa::render {
+namespace bv::render {
 
     GLuint compileShaderProgram(
         std::string_view name, std::span<std::string_view const> vertexSources,
@@ -116,4 +116,4 @@ namespace aa::render {
         return program;
     }
 
-} // namespace aa::render
+} // namespace bv::render

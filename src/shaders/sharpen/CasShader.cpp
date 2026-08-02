@@ -27,7 +27,7 @@
  * THE SOFTWARE.
  */
 
-namespace aa::shaders::cas {
+namespace bv::shaders::cas {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -77,9 +77,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::cas
+} // namespace bv::shaders::cas
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kCasShader{
         "AMD FidelityFX CAS",
@@ -88,4 +88,4 @@ namespace aa::shaders {
         "u_sharpness",
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

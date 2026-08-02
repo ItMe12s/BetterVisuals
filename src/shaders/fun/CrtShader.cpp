@@ -27,7 +27,7 @@
  * THE SOFTWARE.
  */
 
-namespace aa::shaders::crt {
+namespace bv::shaders::crt {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -99,9 +99,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::crt
+} // namespace bv::shaders::crt
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kCrtShader{
         "CRT Filter",
@@ -109,4 +109,4 @@ namespace aa::shaders {
         crt::kFragmentSource,
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

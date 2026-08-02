@@ -3,7 +3,7 @@
 #include <Geode/cocos/platform/CCGL.h>
 #include <array>
 
-namespace aa::render {
+namespace bv::render {
 
     enum class GlStateProfile {
         PostProcess,
@@ -66,4 +66,4 @@ namespace aa::render {
         GlState m_state;
     };
 
-} // namespace aa::render
+} // namespace bv::render

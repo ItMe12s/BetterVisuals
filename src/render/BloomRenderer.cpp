@@ -37,7 +37,7 @@ namespace {
 
 } // namespace
 
-namespace aa::render {
+namespace bv::render {
 
     bool BloomRenderer::initialize() {
         if (m_failed) {
@@ -311,4 +311,4 @@ namespace aa::render {
         m_coreFramebufferApi = false;
     }
 
-} // namespace aa::render
+} // namespace bv::render

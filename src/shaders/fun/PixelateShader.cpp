@@ -7,7 +7,7 @@
  * https://github.com/genekogan/Processing-Shader-Examples/blob/master/TextureShaders/data/pixelate.glsl
  */
 
-namespace aa::shaders::pixelate {
+namespace bv::shaders::pixelate {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -41,9 +41,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::pixelate
+} // namespace bv::shaders::pixelate
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kPixelateShader{
         "Pixelate",
@@ -51,4 +51,4 @@ namespace aa::shaders {
         pixelate::kFragmentSource,
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

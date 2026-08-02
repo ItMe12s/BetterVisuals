@@ -6,7 +6,7 @@
 #include <Geode/cocos/platform/CCGL.h>
 #include <array>
 
-namespace aa::render {
+namespace bv::render {
 
     class SmaaRenderer final {
     public:
@@ -46,4 +46,4 @@ namespace aa::render {
         bool m_failed = false;
     };
 
-} // namespace aa::render
+} // namespace bv::render

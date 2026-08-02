@@ -15,7 +15,7 @@
  * the complete notice is preserved in kAlgorithmSource below.
  */
 
-namespace aa::shaders::smaa {
+namespace bv::shaders::smaa {
 
     constexpr char kVersionSource[] = R"glsl(#version 120
 )glsl";
@@ -754,9 +754,9 @@ void main() {
         kPrograms,
     };
 
-} // namespace aa::shaders::smaa
+} // namespace bv::shaders::smaa
 
-namespace aa::shaders {
+namespace bv::shaders {
     SmaaShaderSet const kSmaaHighShaderSet = smaa::kSmaaHighShaderSet;
     SmaaShaderSet const kSmaaUltraShaderSet = smaa::kSmaaUltraShaderSet;
-} // namespace aa::shaders
+} // namespace bv::shaders

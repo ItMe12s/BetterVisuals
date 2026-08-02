@@ -5,7 +5,7 @@
  * https://github.com/kiwipxl/GLSL-shaders/blob/master/bloom.glsl
  */
 
-namespace aa::shaders::bloom {
+namespace bv::shaders::bloom {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -72,9 +72,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::bloom
+} // namespace bv::shaders::bloom
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     BloomShaderSet const kBloomShaderSet{
         bloom::kVertexSource,
@@ -83,4 +83,4 @@ namespace aa::shaders {
         bloom::kCompositeSource,
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

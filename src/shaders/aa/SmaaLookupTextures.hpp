@@ -36,7 +36,7 @@
  * SOFTWARE.
  */
 
-namespace aa::shaders::smaa {
+namespace bv::shaders::smaa {
 
     inline constexpr std::size_t kAreaTextureWidth = 160;
     inline constexpr std::size_t kAreaTextureHeight = 560;
@@ -12075,4 +12075,4 @@ namespace aa::shaders::smaa {
     static_assert(kAreaTextureBytes.size() == 160 * 560 * 2);
     static_assert(kSearchTextureBytes.size() == 64 * 16);
 
-} // namespace aa::shaders::smaa
+} // namespace bv::shaders::smaa

@@ -8,7 +8,7 @@
 
 using namespace geode::prelude;
 
-namespace aa::render {
+namespace bv::render {
 
     bool PostProcessRenderer::initialize(PostProcessShader const& shader) {
         if (m_shader != &shader) {
@@ -159,4 +159,4 @@ namespace aa::render {
         m_height = 0;
     }
 
-} // namespace aa::render
+} // namespace bv::render

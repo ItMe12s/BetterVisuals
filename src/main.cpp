@@ -39,15 +39,15 @@ namespace {
     std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
-    aa::render::PostProcessRenderer g_postProcessRenderer;
-    aa::render::PostProcessRenderer g_casRenderer;
-    aa::render::BloomRenderer g_bloomRenderer;
-    aa::render::PostProcessRenderer g_grayscaleRenderer;
-    aa::render::PostProcessRenderer g_pixelateRenderer;
-    aa::render::PostProcessRenderer g_ditheringRenderer;
-    aa::render::PostProcessRenderer g_vhsRenderer;
-    aa::render::PostProcessRenderer g_crtRenderer;
-    aa::render::SmaaRenderer g_smaaRenderer;
+    bv::render::PostProcessRenderer g_postProcessRenderer;
+    bv::render::PostProcessRenderer g_casRenderer;
+    bv::render::BloomRenderer g_bloomRenderer;
+    bv::render::PostProcessRenderer g_grayscaleRenderer;
+    bv::render::PostProcessRenderer g_pixelateRenderer;
+    bv::render::PostProcessRenderer g_ditheringRenderer;
+    bv::render::PostProcessRenderer g_vhsRenderer;
+    bv::render::PostProcessRenderer g_crtRenderer;
+    bv::render::SmaaRenderer g_smaaRenderer;
 
     void updateAntiAliasingMode(std::string_view value) {
         if (value == "SMAA High") {
@@ -190,15 +190,15 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
 
         switch (selectedMode) {
             case AntiAliasingMode::Fxaa:
-                g_postProcessRenderer.apply(aa::shaders::kFxaaShader);
+                g_postProcessRenderer.apply(bv::shaders::kFxaaShader);
                 break;
 
             case AntiAliasingMode::SmaaHigh:
-                g_smaaRenderer.apply(aa::shaders::kSmaaHighShaderSet);
+                g_smaaRenderer.apply(bv::shaders::kSmaaHighShaderSet);
                 break;
 
             case AntiAliasingMode::SmaaUltra:
-                g_smaaRenderer.apply(aa::shaders::kSmaaUltraShaderSet);
+                g_smaaRenderer.apply(bv::shaders::kSmaaUltraShaderSet);
                 break;
 
             case AntiAliasingMode::Off: break;
@@ -206,29 +206,29 @@ class $modify(AntiAliasingCCEGLView, CCEGLView) {
 
         if (casEnabled) {
             g_casRenderer.apply(
-                aa::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
+                bv::shaders::kCasShader, g_casSharpness.load(std::memory_order_relaxed)
             );
         }
         if (bloomEnabled) {
             g_bloomRenderer.apply();
         }
         if (grayscaleEnabled) {
-            g_grayscaleRenderer.apply(aa::shaders::kGrayscaleShader);
+            g_grayscaleRenderer.apply(bv::shaders::kGrayscaleShader);
         }
         if (pixelateEnabled) {
-            g_pixelateRenderer.apply(aa::shaders::kPixelateShader);
+            g_pixelateRenderer.apply(bv::shaders::kPixelateShader);
         }
         if (ditheringEnabled) {
-            g_ditheringRenderer.apply(aa::shaders::kDitheringShader);
+            g_ditheringRenderer.apply(bv::shaders::kDitheringShader);
         }
         if (vhsEnabled) {
             static auto const clockStart = std::chrono::steady_clock::now();
             auto const elapsed =
                 std::chrono::duration<GLfloat>(std::chrono::steady_clock::now() - clockStart).count();
-            g_vhsRenderer.apply(aa::shaders::kVhsShader, elapsed);
+            g_vhsRenderer.apply(bv::shaders::kVhsShader, elapsed);
         }
         if (crtEnabled) {
-            g_crtRenderer.apply(aa::shaders::kCrtShader);
+            g_crtRenderer.apply(bv::shaders::kCrtShader);
         }
 
         CCEGLView::swapBuffers();

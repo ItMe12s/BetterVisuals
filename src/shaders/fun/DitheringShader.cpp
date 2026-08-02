@@ -7,7 +7,7 @@
  * https://github.com/paper-design/shaders/blob/main/packages/shaders/src/shaders/dithering.ts
  */
 
-namespace aa::shaders::dithering {
+namespace bv::shaders::dithering {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -52,9 +52,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::dithering
+} // namespace bv::shaders::dithering
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kDitheringShader{
         "Dithering Filter",
@@ -62,4 +62,4 @@ namespace aa::shaders {
         dithering::kFragmentSource,
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders

@@ -7,8 +7,8 @@
 
 namespace {
 
-    aa::render::VertexAttributeState captureVertexAttribute(GLuint index) {
-        aa::render::VertexAttributeState state;
+    bv::render::VertexAttributeState captureVertexAttribute(GLuint index) {
+        bv::render::VertexAttributeState state;
         glGetVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &state.enabled);
         glGetVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &state.buffer);
         glGetVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_SIZE, &state.size);
@@ -28,7 +28,7 @@ namespace {
         }
     }
 
-    void restoreVertexAttribute(GLuint index, aa::render::VertexAttributeState const& state) {
+    void restoreVertexAttribute(GLuint index, bv::render::VertexAttributeState const& state) {
         glBindBuffer(GL_ARRAY_BUFFER, state.buffer);
         glVertexAttribPointer(
             index,
@@ -49,7 +49,7 @@ namespace {
 
 } // namespace
 
-namespace aa::render {
+namespace bv::render {
 
     GlState captureGlState(GlStateProfile profile) {
         GlState state;
@@ -174,4 +174,4 @@ namespace aa::render {
         }
     }
 
-} // namespace aa::render
+} // namespace bv::render

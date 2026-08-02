@@ -5,7 +5,7 @@
 #include <Geode/cocos/platform/CCGL.h>
 #include <string_view>
 
-namespace aa::render {
+namespace bv::render {
 
     struct PostProcessShader {
         std::string_view name;
@@ -40,4 +40,4 @@ namespace aa::render {
         bool m_failed = false;
     };
 
-} // namespace aa::render
+} // namespace bv::render

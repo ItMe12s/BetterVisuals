@@ -7,7 +7,7 @@
  * https://www.shadertoy.com/view/XtBXDt
  */
 
-namespace aa::shaders::vhs {
+namespace bv::shaders::vhs {
 
     constexpr char kVertexSource[] = R"glsl(#version 120
 attribute vec2 a_position;
@@ -128,9 +128,9 @@ void main() {
 }
 )glsl";
 
-} // namespace aa::shaders::vhs
+} // namespace bv::shaders::vhs
 
-namespace aa::shaders {
+namespace bv::shaders {
 
     render::PostProcessShader const kVhsShader{
         "VHS Filter",
@@ -139,4 +139,4 @@ namespace aa::shaders {
         "u_time",
     };
 
-} // namespace aa::shaders
+} // namespace bv::shaders
