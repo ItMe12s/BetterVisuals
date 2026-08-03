@@ -110,16 +110,8 @@ namespace bv::render {
         restoreGlState(m_state);
 #ifndef NDEBUG
         auto const restored = captureGlState();
-        assert((restored == m_state) && "Anti-aliasing renderer failed to restore OpenGL state");
+        assert((restored == m_state) && "Post-processing failed to restore OpenGL state");
 #endif
-    }
-
-    std::array<GLint, 4> const& GlStateGuard::viewport() const {
-        return m_state.viewport;
-    }
-
-    GLuint GlStateGuard::framebuffer() const {
-        return static_cast<GLuint>(m_state.framebuffer);
     }
 
 } // namespace bv::render

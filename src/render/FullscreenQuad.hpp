@@ -11,7 +11,6 @@ namespace bv::render {
         static constexpr GLuint kTexCoordAttribute = 1;
 
         FullscreenQuad() = default;
-        ~FullscreenQuad() = default;
 
         FullscreenQuad(FullscreenQuad const&) = delete;
         FullscreenQuad& operator=(FullscreenQuad const&) = delete;

@@ -45,7 +45,7 @@
 		"cas-enabled": {
 			"type": "bool",
 			"name": "AMD FidelityFX CAS",
-			"description": "Apply contrast-adaptive sharpening after anti-aliasing.",
+			"description": "Apply contrast-adaptive sharpening.",
 			"default": false
 		},
 		"cas-sharpness": {

@@ -39,32 +39,15 @@ namespace {
 
 namespace bv::render {
 
-    bool SmaaRenderer::isReady(
-        shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height
-    ) const {
-        return !m_failed && m_shaders == &shaders && m_programs[0].handle != 0 &&
-            m_width == width && m_height == height;
-    }
-
-    bool SmaaRenderer::prepare(
-        shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height, GLuint framebuffer
-    ) {
-        if (isReady(shaders, width, height)) {
-            return true;
-        }
-
+    bool SmaaRenderer::prepare(shaders::smaa::ShaderSet const& shaders, GLsizei width, GLsizei height) {
         glActiveTexture(GL_TEXTURE0);
-        return initialize(shaders) && resizeTextures(width, height, framebuffer);
+        return initialize(shaders) && resizeTextures(width, height);
     }
 
     bool SmaaRenderer::initialize(shaders::smaa::ShaderSet const& shaders) {
         if (m_shaders != &shaders) {
             destroyResources();
             m_shaders = &shaders;
-            m_failed = false;
-        }
-        if (m_failed) {
-            return false;
         }
         if (m_programs[0].handle != 0) {
             return true;
@@ -88,14 +71,12 @@ namespace bv::render {
                 compileShaderProgram(source.name, vertexSources, fragmentSources);
             if (m_programs[index].handle == 0) {
                 destroyResources();
-                m_failed = true;
                 return false;
             }
             m_programs[index].metrics = glGetUniformLocation(m_programs[index].handle, "u_metrics");
             if (m_programs[index].metrics < 0) {
                 log::error("{} shader is missing u_metrics", shaders.programs[index].name);
                 destroyResources();
-                m_failed = true;
                 return false;
             }
         }
@@ -110,7 +91,6 @@ namespace bv::render {
             neighborhoodColor < 0 || blendTexture < 0) {
             log::error("SMAA shader is missing required texture uniforms");
             destroyResources();
-            m_failed = true;
             return false;
         }
 
@@ -132,13 +112,14 @@ namespace bv::render {
         };
         std::array<GLuint, 4> textures = {};
         glGenTextures(static_cast<GLsizei>(textures.size()), textures.data());
+        glGenFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
         for (std::size_t index = 0; index < textures.size(); ++index) {
             *textureHandles[index] = textures[index];
         }
-        if (m_edgeTexture == 0 || m_weightTexture == 0 || m_areaTexture == 0 || m_searchTexture == 0) {
+        if (m_edgeTexture == 0 || m_weightTexture == 0 || m_areaTexture == 0 ||
+            m_searchTexture == 0 || m_framebuffers[0] == 0 || m_framebuffers[1] == 0) {
             log::error("Unable to allocate SMAA OpenGL objects");
             destroyResources();
-            m_failed = true;
             return false;
         }
         for (auto texture : textures) {
@@ -155,7 +136,6 @@ namespace bv::render {
             )) {
             log::error("Unable to upload the SMAA area lookup texture");
             destroyResources();
-            m_failed = true;
             return false;
         }
 
@@ -169,14 +149,13 @@ namespace bv::render {
             )) {
             log::error("Unable to upload the SMAA search lookup texture");
             destroyResources();
-            m_failed = true;
             return false;
         }
 
         return true;
     }
 
-    bool SmaaRenderer::resizeTextures(GLsizei width, GLsizei height, GLuint framebuffer) {
+    bool SmaaRenderer::resizeTextures(GLsizei width, GLsizei height) {
         if (width == m_width && height == m_height) {
             return true;
         }
@@ -186,17 +165,21 @@ namespace bv::render {
             if (!uploadTexture(GL_RGBA, width, height, GL_RGBA, nullptr)) {
                 log::error("Unable to allocate a {}x{} SMAA framebuffer texture", width, height);
                 destroyResources();
-                m_failed = true;
                 return false;
             }
         }
 
-        if (!validateFramebuffer(framebuffer, m_edgeTexture) ||
-            !validateFramebuffer(framebuffer, m_weightTexture)) {
-            log::error("Unable to create complete SMAA framebuffers");
-            destroyResources();
-            m_failed = true;
-            return false;
+        std::array textures{m_edgeTexture, m_weightTexture};
+        for (std::size_t index = 0; index < m_framebuffers.size(); ++index) {
+            glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[index]);
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures[index], 0
+            );
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                log::error("Unable to create complete SMAA framebuffer {}", index);
+                destroyResources();
+                return false;
+            }
         }
 
         for (auto const& program : m_programs) {
@@ -215,33 +198,19 @@ namespace bv::render {
         return true;
     }
 
-    bool SmaaRenderer::validateFramebuffer(GLuint framebuffer, GLuint texture) {
-        attachTexture(framebuffer, texture);
-        return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-    }
-
-    void SmaaRenderer::attachTexture(GLuint framebuffer, GLuint texture) {
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-    }
-
-    bool SmaaRenderer::apply(GLuint inputTexture, GLuint outputTexture, GLuint framebuffer) {
-        if (m_failed || m_programs[0].handle == 0 || inputTexture == 0 || outputTexture == 0 ||
-            framebuffer == 0) {
-            return false;
-        }
-        assert(inputTexture != outputTexture);
+    void SmaaRenderer::apply(GLuint inputTexture, RenderTarget const& target) {
+        assert(m_programs[0].handle != 0 && inputTexture != 0);
 
         glActiveTexture(GL_TEXTURE0);
         glClearColor(0.f, 0.f, 0.f, 0.f);
         glViewport(0, 0, m_width, m_height);
-        attachTexture(framebuffer, m_edgeTexture);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(m_programs[0].handle);
         glBindTexture(GL_TEXTURE_2D, inputTexture);
         FullscreenQuad::draw();
 
-        attachTexture(framebuffer, m_weightTexture);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[1]);
         glUseProgram(m_programs[1].handle);
         glBindTexture(GL_TEXTURE_2D, m_edgeTexture);
         glActiveTexture(GL_TEXTURE1);
@@ -250,20 +219,19 @@ namespace bv::render {
         glBindTexture(GL_TEXTURE_2D, m_searchTexture);
         FullscreenQuad::draw();
 
-        attachTexture(framebuffer, outputTexture);
+        glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
+        glViewport(target.x, target.y, target.width, target.height);
         glUseProgram(m_programs[2].handle);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_weightTexture);
         FullscreenQuad::draw();
-        return true;
     }
 
     void SmaaRenderer::reset() {
         destroyResources();
         m_shaders = nullptr;
-        m_failed = false;
     }
 
     void SmaaRenderer::destroyResources() {
@@ -274,6 +242,8 @@ namespace bv::render {
             m_searchTexture,
         };
         glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
+        glDeleteFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
+        m_framebuffers = {};
         m_edgeTexture = 0;
         m_weightTexture = 0;
         m_areaTexture = 0;

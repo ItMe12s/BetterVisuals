@@ -571,7 +571,7 @@ vec4 SMAABlendingWeightCalculationPS(vec2 texcoord,
         // Find the distance to the top:
         vec3 coords;
         coords.y = SMAASearchYUp(edgesTex, searchTex, offset[1].xy, offset[2].z);
-        coords.x = offset[0].x; // offset[1].x = texcoord.x - 0.25 * SMAA_RT_METRICS.x;
+        coords.x = offset[0].x;
         d.x = coords.y;
 
         // Fetch the top crossing edges:
@@ -694,7 +694,7 @@ vec3 smaaLinearToSrgb(vec3 color) {
 void main() {
     /*
      * The RGBA copy contains display-encoded values without automatic
-     * sRGB decoding. Edge detection reads them directly; only blended pixels
+     * sRGB decoding. Edge detection reads them directly. Only blended pixels
      * are decoded to linear light and encoded once after blending.
      */
     vec4 weights;

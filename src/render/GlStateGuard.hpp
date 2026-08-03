@@ -44,8 +44,13 @@ namespace bv::render {
         GlStateGuard(GlStateGuard const&) = delete;
         GlStateGuard& operator=(GlStateGuard const&) = delete;
 
-        std::array<GLint, 4> const& viewport() const;
-        GLuint framebuffer() const;
+        GLuint framebuffer() const {
+            return static_cast<GLuint>(m_state.framebuffer);
+        }
+
+        std::array<GLint, 4> const& viewport() const {
+            return m_state.viewport;
+        }
 
     private:
         GlState m_state;

@@ -36,23 +36,12 @@ namespace {
 
 namespace bv::render {
 
-    bool BloomRenderer::isReady(GLsizei width, GLsizei height) const {
-        return !m_failed && m_programs[0].handle != 0 && m_width == width && m_height == height;
-    }
-
-    bool BloomRenderer::prepare(GLsizei width, GLsizei height, GLuint framebuffer) {
-        if (isReady(width, height)) {
-            return true;
-        }
-
+    bool BloomRenderer::prepare(GLsizei width, GLsizei height) {
         glActiveTexture(GL_TEXTURE0);
-        return initialize() && resizeTextures(width, height, framebuffer);
+        return initialize() && resizeTextures(width, height);
     }
 
     bool BloomRenderer::initialize() {
-        if (m_failed) {
-            return false;
-        }
         if (m_programs[0].handle != 0) {
             return true;
         }
@@ -75,7 +64,6 @@ namespace bv::render {
                 compileShaderProgram(names[index], vertexSource, fragmentSource);
             if (m_programs[index].handle == 0) {
                 destroyResources();
-                m_failed = true;
                 return false;
             }
         }
@@ -88,7 +76,6 @@ namespace bv::render {
             if (texture < 0 || program.offset < 0) {
                 log::error("{} shader is missing required uniforms", names[index]);
                 destroyResources();
-                m_failed = true;
                 return false;
             }
             glUseProgram(program.handle);
@@ -101,22 +88,21 @@ namespace bv::render {
         if (sourceTexture < 0 || bloomTexture < 0) {
             log::error("Bloom composite shader is missing required uniforms");
             destroyResources();
-            m_failed = true;
             return false;
         }
         glUseProgram(composite.handle);
         glUniform1i(sourceTexture, 0);
         glUniform1i(bloomTexture, 1);
 
-        std::array<GLuint, 3> textures = {};
+        std::array<GLuint, 2> textures = {};
         glGenTextures(static_cast<GLsizei>(textures.size()), textures.data());
-        m_prefilterTexture = textures[0];
+        glGenFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
+        m_bloomTexture = textures[0];
         m_horizontalTexture = textures[1];
-        m_verticalTexture = textures[2];
-        if (m_prefilterTexture == 0 || m_horizontalTexture == 0 || m_verticalTexture == 0) {
+        if (m_bloomTexture == 0 || m_horizontalTexture == 0 || m_framebuffers[0] == 0 ||
+            m_framebuffers[1] == 0) {
             log::error("Unable to allocate bloom OpenGL objects");
             destroyResources();
-            m_failed = true;
             return false;
         }
         for (auto texture : textures) {
@@ -125,28 +111,30 @@ namespace bv::render {
         return true;
     }
 
-    bool BloomRenderer::resizeTextures(GLsizei width, GLsizei height, GLuint framebuffer) {
+    bool BloomRenderer::resizeTextures(GLsizei width, GLsizei height) {
         if (width == m_width && height == m_height) {
             return true;
         }
 
         auto const halfWidth = (width + 1) / 2;
         auto const halfHeight = (height + 1) / 2;
-        if (!allocateTexture(m_prefilterTexture, halfWidth, halfHeight) ||
-            !allocateTexture(m_horizontalTexture, halfWidth, halfHeight) ||
-            !allocateTexture(m_verticalTexture, halfWidth, halfHeight)) {
+        if (!allocateTexture(m_bloomTexture, halfWidth, halfHeight) ||
+            !allocateTexture(m_horizontalTexture, halfWidth, halfHeight)) {
             log::error("Unable to allocate {}x{} bloom textures", width, height);
             destroyResources();
-            m_failed = true;
             return false;
         }
-        if (!validateFramebuffer(framebuffer, m_prefilterTexture) ||
-            !validateFramebuffer(framebuffer, m_horizontalTexture) ||
-            !validateFramebuffer(framebuffer, m_verticalTexture)) {
-            log::error("Unable to create complete bloom framebuffers");
-            destroyResources();
-            m_failed = true;
-            return false;
+        std::array textures{m_bloomTexture, m_horizontalTexture};
+        for (std::size_t index = 0; index < m_framebuffers.size(); ++index) {
+            glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[index]);
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures[index], 0
+            );
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                log::error("Unable to create complete bloom framebuffer {}", index);
+                destroyResources();
+                return false;
+            }
         }
 
         glUseProgram(m_programs[0].handle);
@@ -166,67 +154,51 @@ namespace bv::render {
         return true;
     }
 
-    bool BloomRenderer::validateFramebuffer(GLuint framebuffer, GLuint texture) {
-        attachTexture(framebuffer, texture);
-        return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-    }
-
-    void BloomRenderer::attachTexture(GLuint framebuffer, GLuint texture) {
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-    }
-
-    bool BloomRenderer::apply(GLuint inputTexture, GLuint outputTexture, GLuint framebuffer) {
-        if (m_failed || m_programs[0].handle == 0 || inputTexture == 0 || outputTexture == 0 ||
-            framebuffer == 0) {
-            return false;
-        }
-        assert(inputTexture != outputTexture);
+    void BloomRenderer::apply(GLuint inputTexture, RenderTarget const& target) {
+        assert(m_programs[0].handle != 0 && inputTexture != 0);
 
         glActiveTexture(GL_TEXTURE0);
         glViewport(0, 0, m_halfWidth, m_halfHeight);
-        attachTexture(framebuffer, m_prefilterTexture);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
         glUseProgram(m_programs[0].handle);
         glBindTexture(GL_TEXTURE_2D, inputTexture);
         FullscreenQuad::draw();
 
-        attachTexture(framebuffer, m_horizontalTexture);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[1]);
         glUseProgram(m_programs[1].handle);
         glUniform2f(m_programs[1].offset, m_blurStepX, 0.f);
-        glBindTexture(GL_TEXTURE_2D, m_prefilterTexture);
+        glBindTexture(GL_TEXTURE_2D, m_bloomTexture);
         FullscreenQuad::draw();
 
-        attachTexture(framebuffer, m_verticalTexture);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
         glUniform2f(m_programs[1].offset, 0.f, m_blurStepY);
         glBindTexture(GL_TEXTURE_2D, m_horizontalTexture);
         FullscreenQuad::draw();
 
-        attachTexture(framebuffer, outputTexture);
-        glViewport(0, 0, m_width, m_height);
+        glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
+        glViewport(target.x, target.y, target.width, target.height);
         glUseProgram(m_programs[2].handle);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputTexture);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_verticalTexture);
+        glBindTexture(GL_TEXTURE_2D, m_bloomTexture);
         FullscreenQuad::draw();
-        return true;
     }
 
     void BloomRenderer::reset() {
         destroyResources();
-        m_failed = false;
     }
 
     void BloomRenderer::destroyResources() {
-        std::array<GLuint, 3> const textures = {
-            m_prefilterTexture,
+        std::array<GLuint, 2> const textures = {
+            m_bloomTexture,
             m_horizontalTexture,
-            m_verticalTexture,
         };
         glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
-        m_prefilterTexture = 0;
+        glDeleteFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
+        m_framebuffers = {};
+        m_bloomTexture = 0;
         m_horizontalTexture = 0;
-        m_verticalTexture = 0;
 
         for (auto& program : m_programs) {
             if (program.handle != 0) {
