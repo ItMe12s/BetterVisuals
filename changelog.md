@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- Switched post-processing to scene visits
+
 ## 1.2.0
 
 - Faster stacked effects with a single-copy renderer
