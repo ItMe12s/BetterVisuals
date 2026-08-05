@@ -31,6 +31,7 @@ namespace bv::render {
         GLboolean scissorTest = GL_FALSE;
         GLboolean cullFace = GL_FALSE;
         GLint framebuffer = 0;
+        GLint renderbuffer = 0;
         std::array<VertexAttributeState, 2> attributes = {};
 
         bool operator==(GlState const&) const = default;
@@ -43,14 +44,6 @@ namespace bv::render {
 
         GlStateGuard(GlStateGuard const&) = delete;
         GlStateGuard& operator=(GlStateGuard const&) = delete;
-
-        GLuint framebuffer() const {
-            return static_cast<GLuint>(m_state.framebuffer);
-        }
-
-        std::array<GLint, 4> const& viewport() const {
-            return m_state.viewport;
-        }
 
     private:
         GlState m_state;

@@ -45,8 +45,10 @@ namespace bv::render {
 
         glGenTextures(static_cast<GLsizei>(m_textures.size()), m_textures.data());
         glGenFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
+        glGenRenderbuffers(1, &m_depthStencilRenderbuffer);
         if (m_textures[0] == 0 || m_textures[1] == 0 || m_framebuffers[0] == 0 ||
-            m_framebuffers[1] == 0 || !m_quad.initialize("post-process pipeline")) {
+            m_framebuffers[1] == 0 || m_depthStencilRenderbuffer == 0 ||
+            !m_quad.initialize("post-process pipeline")) {
             log::error("Unable to allocate post-process pipeline OpenGL objects");
             destroyResources();
             return false;
@@ -70,13 +72,27 @@ namespace bv::render {
             return false;
         }
 
+        glBindRenderbuffer(GL_RENDERBUFFER, m_depthStencilRenderbuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+
         for (std::size_t index = 0; index < m_framebuffers.size(); ++index) {
             glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[index]);
             glFramebufferTexture2D(
                 GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_textures[index], 0
             );
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                log::error("Unable to create complete post-process target {}", index);
+            if (index == 0) {
+                glFramebufferRenderbuffer(
+                    GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthStencilRenderbuffer
+                );
+                glFramebufferRenderbuffer(
+                    GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_depthStencilRenderbuffer
+                );
+            }
+            auto const status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (status != GL_FRAMEBUFFER_COMPLETE) {
+                log::error(
+                    "Unable to create complete post-process target {} (status {:#x})", index, status
+                );
                 destroyResources();
                 return false;
             }
@@ -87,24 +103,35 @@ namespace bv::render {
         return true;
     }
 
-    bool PostProcessPipeline::copyViewportFrom(
-        GLuint sourceFramebuffer, std::array<GLint, 4> const& sourceViewport
-    ) {
-        assert(m_textures[0] != 0 && "Post-process pipeline must be prepared before copying");
-        assert(sourceViewport[2] == m_width && sourceViewport[3] == m_height);
+    void PostProcessPipeline::beginSceneCapture() {
+        assert(m_framebuffers[0] != 0 && "Post-process pipeline must be prepared before capture");
         m_currentIndex = 0;
-        glBindFramebuffer(GL_FRAMEBUFFER, sourceFramebuffer);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_textures[0]);
-        clearGlErrors();
-        glCopyTexSubImage2D(
-            GL_TEXTURE_2D, 0, 0, 0, sourceViewport[0], sourceViewport[1], m_width, m_height
-        );
-        if (auto const error = glGetError(); error != GL_NO_ERROR) {
-            log::error("Unable to copy source viewport (OpenGL error {})", error);
-            return false;
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
+        glViewport(0, 0, m_width, m_height);
+
+        std::array<GLboolean, 4> colorWriteMask = {};
+        GLboolean depthWriteMask = GL_TRUE;
+        GLint frontStencilWriteMask = 0;
+        GLint backStencilWriteMask = 0;
+        auto const scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        glGetBooleanv(GL_COLOR_WRITEMASK, colorWriteMask.data());
+        glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWriteMask);
+        glGetIntegerv(GL_STENCIL_WRITEMASK, &frontStencilWriteMask);
+        glGetIntegerv(GL_STENCIL_BACK_WRITEMASK, &backStencilWriteMask);
+
+        glDisable(GL_SCISSOR_TEST);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        glDepthMask(GL_TRUE);
+        glStencilMask(~0u);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        glColorMask(colorWriteMask[0], colorWriteMask[1], colorWriteMask[2], colorWriteMask[3]);
+        glDepthMask(depthWriteMask);
+        glStencilMaskSeparate(GL_FRONT, static_cast<GLuint>(frontStencilWriteMask));
+        glStencilMaskSeparate(GL_BACK, static_cast<GLuint>(backStencilWriteMask));
+        if (scissorEnabled == GL_TRUE) {
+            glEnable(GL_SCISSOR_TEST);
         }
-        return true;
     }
 
     void PostProcessPipeline::bindQuad() const {
@@ -130,8 +157,10 @@ namespace bv::render {
 
     void PostProcessPipeline::destroyResources() {
         m_quad.reset();
+        glDeleteRenderbuffers(1, &m_depthStencilRenderbuffer);
         glDeleteFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
         glDeleteTextures(static_cast<GLsizei>(m_textures.size()), m_textures.data());
+        m_depthStencilRenderbuffer = 0;
         m_framebuffers = {};
         m_textures = {};
         m_width = 0;

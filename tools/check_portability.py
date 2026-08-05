@@ -9,7 +9,6 @@ SRC = ROOT / "src"
 SHADERS = SRC / "shaders"
 RENDER = SRC / "render"
 SHADER_PROGRAM = RENDER / "ShaderProgram.cpp"
-POST_PROCESS_PIPELINE = RENDER / "PostProcessPipeline.cpp"
 SOURCE_SUFFIXES = {".cpp", ".hpp"}
 
 BANNED_GL = {
@@ -20,8 +19,8 @@ BANNED_GL = {
         r"\bGL_(?:READ|DRAW)_FRAMEBUFFER(?:_BINDING)?\b"
     ),
     "framebuffer blit": re.compile(r"\bglBlit(?:Named)?Framebuffer\b"),
-    "alternate framebuffer copy": re.compile(
-        r"\b(?:glCopyTexImage[12]D|glCopyTexSubImage[13]D|"
+    "framebuffer copy": re.compile(
+        r"\b(?:glCopyTexImage[12]D|glCopyTexSubImage[123]D|"
         r"glCopyTextureSubImage[123]D|glCopyImageSubData)\b"
     ),
     "framebuffer readback": re.compile(
@@ -110,20 +109,6 @@ def main() -> int:
                 failures.append(
                     f"{relative(path)}:{line_number}: renderer platform branch: {match.group(0)}"
                 )
-
-    copy_sites: list[tuple[Path, int]] = []
-    for path in source_files:
-        text = path.read_text(encoding="utf-8")
-        for match in re.finditer(r"\bglCopyTexSubImage2D\b", text):
-            copy_sites.append((path, text.count("\n", 0, match.start()) + 1))
-    if len(copy_sites) != 1 or copy_sites[0][0] != POST_PROCESS_PIPELINE:
-        rendered_sites = (
-            ", ".join(f"{relative(path)}:{line}" for path, line in copy_sites) or "none"
-        )
-        failures.append(
-            "expected exactly one glCopyTexSubImage2D in "
-            f"{relative(POST_PROCESS_PIPELINE)}, found {rendered_sites}"
-        )
 
     if failures:
         print("Portability check failed:")

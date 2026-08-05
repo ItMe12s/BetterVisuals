@@ -23,7 +23,7 @@ namespace bv::render {
         PostProcessPipeline& operator=(PostProcessPipeline const&) = delete;
 
         bool prepare(GLsizei width, GLsizei height);
-        bool copyViewportFrom(GLuint sourceFramebuffer, std::array<GLint, 4> const& sourceViewport);
+        void beginSceneCapture();
         void bindQuad() const;
         RenderTarget nextTarget() const;
         void advanceStage();
@@ -38,6 +38,7 @@ namespace bv::render {
 
         std::array<GLuint, 2> m_textures = {};
         std::array<GLuint, 2> m_framebuffers = {};
+        GLuint m_depthStencilRenderbuffer = 0;
         FullscreenQuad m_quad;
         GLsizei m_width = 0;
         GLsizei m_height = 0;

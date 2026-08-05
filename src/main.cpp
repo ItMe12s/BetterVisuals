@@ -8,8 +8,11 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
-#include <Geode/modify/CCEGLView.hpp>
+#include <Geode/modify/CCNode.hpp>
 #include <Geode/platform/cplatform.h>
+#ifdef GEODE_IS_WINDOWS
+    #include <Geode/modify/CCEGLView.hpp>
+#endif
 #ifdef GEODE_IS_MOBILE
     #include <Geode/modify/AppDelegate.hpp>
 #endif
@@ -88,6 +91,7 @@ namespace {
     bv::render::SmaaRenderer g_smaaRenderer;
     std::optional<PostProcessKey> g_preparedPostProcessKey;
     std::optional<PostProcessFailureKey> g_failedPostProcessKey;
+    bool g_isRootSceneVisitActive = false;
 
     void resetRenderResources() {
         g_postProcessPipeline.reset();
@@ -147,6 +151,7 @@ namespace {
             return true;
         }
 
+        bv::render::GlStateGuard prepareState;
         auto const& config = key.config;
         bool prepared = g_postProcessPipeline.prepare(key.width, key.height);
         switch (config.aa) {
@@ -295,6 +300,63 @@ namespace {
         }
     }
 
+    void renderSceneWithPostProcessing(auto&& visitNext) {
+        auto const config = selectedPostProcessConfig();
+        if (config.effectCount() == 0) {
+            if (g_preparedPostProcessKey || g_failedPostProcessKey) {
+                resetRenderResources();
+            }
+            visitNext();
+            return;
+        }
+
+        GLint callerFramebuffer = 0;
+        std::array<GLint, 4> callerViewport = {};
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &callerFramebuffer);
+        glGetIntegerv(GL_VIEWPORT, callerViewport.data());
+        auto const width = static_cast<GLsizei>(callerViewport[2]);
+        auto const height = static_cast<GLsizei>(callerViewport[3]);
+        PostProcessKey const key{config, width, height};
+        PostProcessFailureKey const failureKey{
+            config,
+            static_cast<GLuint>(callerFramebuffer),
+            callerViewport,
+        };
+
+        if (width <= 0 || height <= 0 ||
+            (g_failedPostProcessKey && *g_failedPostProcessKey == failureKey)) {
+            visitNext();
+            return;
+        }
+        if (!preparePostProcess(key)) {
+            resetRenderResources();
+            g_failedPostProcessKey = failureKey;
+            log::error("Post-processing disabled for this configuration");
+            visitNext();
+            return;
+        }
+
+        bv::render::RenderTarget const callerTarget{
+            static_cast<GLuint>(callerFramebuffer),
+            callerViewport[0],
+            callerViewport[1],
+            width,
+            height,
+        };
+
+        g_postProcessPipeline.beginSceneCapture();
+        visitNext();
+        {
+            bv::render::GlStateGuard postSceneState;
+            renderEffects(
+                config, config.cas ? g_casSharpness.load(std::memory_order_relaxed) : 0.f, callerTarget
+            );
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, callerTarget.framebuffer);
+        glViewport(callerTarget.x, callerTarget.y, callerTarget.width, callerTarget.height);
+        g_failedPostProcessKey.reset();
+    }
+
 } // namespace
 
 $on_mod(Loaded) {
@@ -350,80 +412,36 @@ $on_mod(Loaded) {
     });
 }
 
-class $modify(BetterVisualsEGLView, CCEGLView) {
+class $modify(BetterVisualsSceneVisitHook, CCNode) {
     static void onModify(auto& self) {
-        if (!self.setHookPriorityPre("cocos2d::CCEGLView::swapBuffers", Priority::Last)) {
-            log::warn("Unable to set the swap hook priority");
+        if (!self.setHookPriorityPre("cocos2d::CCNode::visit", Priority::VeryLate)) {
+            log::warn("Unable to set CCNode::visit hook priority");
         }
     }
 
-    void swapBuffers() {
-        auto const config = selectedPostProcessConfig();
-        if (config.effectCount() == 0) {
-            if (g_preparedPostProcessKey || g_failedPostProcessKey) {
-                resetRenderResources();
-            }
-            CCEGLView::swapBuffers();
+    void visit() {
+        if (g_isRootSceneVisitActive ||
+            static_cast<CCNode*>(this) != CCDirector::get()->getRunningScene()) {
+            CCNode::visit();
             return;
         }
 
-        if (g_failedPostProcessKey && g_failedPostProcessKey->config == config) {
-            GLint framebuffer = 0;
-            std::array<GLint, 4> viewport = {};
-            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
-            glGetIntegerv(GL_VIEWPORT, viewport.data());
-            if (g_failedPostProcessKey ==
-                PostProcessFailureKey{
-                    config,
-                    static_cast<GLuint>(framebuffer),
-                    viewport,
-                }) {
-                CCEGLView::swapBuffers();
-                return;
-            }
-        }
-
-        {
-            bv::render::GlStateGuard state;
-            auto const framebuffer = state.framebuffer();
-            auto const& viewport = state.viewport();
-            auto const width = static_cast<GLsizei>(viewport[2]);
-            auto const height = static_cast<GLsizei>(viewport[3]);
-            PostProcessKey const key{config, width, height};
-            PostProcessFailureKey const failureKey{config, framebuffer, viewport};
-            if (width > 0 && height > 0) {
-                if (!preparePostProcess(key) ||
-                    !g_postProcessPipeline.copyViewportFrom(framebuffer, viewport)) {
-                    resetRenderResources();
-                    g_failedPostProcessKey = failureKey;
-                    log::error("Post-processing disabled for this configuration");
-                }
-                else {
-                    renderEffects(
-                        config,
-                        config.cas ? g_casSharpness.load(std::memory_order_relaxed) : 0.f,
-                        {
-                            framebuffer,
-                            viewport[0],
-                            viewport[1],
-                            width,
-                            height,
-                        }
-                    );
-                    g_failedPostProcessKey.reset();
-                }
-            }
-        }
-        CCEGLView::swapBuffers();
+        g_isRootSceneVisitActive = true;
+        renderSceneWithPostProcessing([this] {
+            CCNode::visit();
+        });
+        g_isRootSceneVisitActive = false;
     }
+};
 
 #ifdef GEODE_IS_WINDOWS
+class $modify(BetterVisualsEGLView, CCEGLView) {
     void toggleFullScreen(bool value, bool borderless, bool fix) {
         resetRenderResources();
         CCEGLView::toggleFullScreen(value, borderless, fix);
     }
-#endif
 };
+#endif
 
 #ifdef GEODE_IS_MOBILE
 class $modify(BetterVisualsAppDelegate, AppDelegate) {

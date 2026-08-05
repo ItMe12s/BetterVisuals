@@ -73,6 +73,7 @@ namespace bv::render {
         state.cullFace = glIsEnabled(GL_CULL_FACE);
 
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &state.framebuffer);
+        glGetIntegerv(GL_RENDERBUFFER_BINDING, &state.renderbuffer);
 
         state.attributes[0] = captureVertexAttribute(FullscreenQuad::kPositionAttribute);
         state.attributes[1] = captureVertexAttribute(FullscreenQuad::kTexCoordAttribute);
@@ -92,6 +93,7 @@ namespace bv::render {
         glUseProgram(state.program);
 
         glBindFramebuffer(GL_FRAMEBUFFER, state.framebuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, state.renderbuffer);
         glViewport(state.viewport[0], state.viewport[1], state.viewport[2], state.viewport[3]);
         glClearColor(
             state.clearColor[0], state.clearColor[1], state.clearColor[2], state.clearColor[3]
