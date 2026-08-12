@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- New metadata for release
+
 ## 1.3.0
 
 - Switched post-processing to scene visits
