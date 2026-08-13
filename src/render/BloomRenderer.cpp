@@ -198,6 +198,16 @@ namespace bv::render {
         glBindTexture(GL_TEXTURE_2D, m_horizontalTexture);
         FullscreenQuad::draw();
 
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[1]);
+        glUniform2f(m_programs[1].offset, m_blurStepX, 0.f);
+        glBindTexture(GL_TEXTURE_2D, m_bloomTexture);
+        FullscreenQuad::draw();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
+        glUniform2f(m_programs[1].offset, 0.f, m_blurStepY);
+        glBindTexture(GL_TEXTURE_2D, m_horizontalTexture);
+        FullscreenQuad::draw();
+
         glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
         glViewport(target.x, target.y, target.width, target.height);
         glUseProgram(m_programs[2].handle);

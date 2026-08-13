@@ -24,18 +24,7 @@ vec3 brightPass(vec3 color) {
 
 void main() {
     vec2 baseUv = gl_FragCoord.xy * 2.0 * u_invResolution;
-    vec2 sampleOffset = 0.5 * u_invResolution;
-    vec3 bloom = brightPass(texture2D(
-        u_texture, baseUv + vec2(-sampleOffset.x, -sampleOffset.y)
-    ).rgb);
-    bloom += brightPass(texture2D(
-        u_texture, baseUv + vec2(sampleOffset.x, -sampleOffset.y)
-    ).rgb);
-    bloom += brightPass(texture2D(
-        u_texture, baseUv + vec2(-sampleOffset.x, sampleOffset.y)
-    ).rgb);
-    bloom += brightPass(texture2D(u_texture, baseUv + sampleOffset).rgb);
-    gl_FragColor = vec4(bloom * 0.25, 1.0);
+    gl_FragColor = vec4(brightPass(texture2D(u_texture, baseUv).rgb), 1.0);
 }
 )glsl";
 
@@ -45,12 +34,10 @@ uniform vec2 u_texelStep;
 varying vec2 v_texCoord;
 
 void main() {
-    vec3 bloom = texture2D(u_texture, v_texCoord - u_texelStep * 3.0).rgb * 0.070159;
-    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 2.0).rgb * 0.131075;
-    bloom += texture2D(u_texture, v_texCoord - u_texelStep).rgb * 0.190713;
-    bloom += texture2D(u_texture, v_texCoord).rgb * 0.216106;
-    bloom += texture2D(u_texture, v_texCoord + u_texelStep).rgb * 0.190713;
-    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 2.0).rgb * 0.131075;
+    vec3 bloom = texture2D(u_texture, v_texCoord).rgb * 0.216106;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 1.40733).rgb * 0.321788;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 1.40733).rgb * 0.321788;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 3.0).rgb * 0.070159;
     bloom += texture2D(u_texture, v_texCoord + u_texelStep * 3.0).rgb * 0.070159;
     gl_FragColor = vec4(bloom, 1.0);
 }

@@ -2,7 +2,7 @@
 
 ## 1.4.0
 
-- Made bloom customizable
+- Made bloom customizable and prettier
 
 ## 1.3.1
 
