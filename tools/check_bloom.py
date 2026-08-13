@@ -19,21 +19,21 @@ def clamp(value: float) -> float:
     return min(max(value, 0.0), 1.0)
 
 
-def bright_pass(value: float) -> float:
-    return clamp((value - THRESHOLD) / (1.0 - THRESHOLD))
+def bright_pass(value: float, threshold: float = THRESHOLD) -> float:
+    return clamp((value - threshold) / max(1.0 - threshold, 0.001))
 
 
 def prefilter(samples: list[float]) -> float:
     return sum(bright_pass(value) for value in samples) / PREFILTER_TAPS
 
 
-def bloom(source: float, samples: list[float]) -> float:
+def bloom(source: float, samples: list[float], intensity: float = INTENSITY) -> float:
     glow = sum(
         samples[y * KERNEL_TAPS + x] * KERNEL_WEIGHTS[x] * KERNEL_WEIGHTS[y]
         for y in range(KERNEL_TAPS)
         for x in range(KERNEL_TAPS)
     )
-    return clamp(source + glow * INTENSITY)
+    return clamp(source + glow * intensity)
 
 
 def kernel_radius_pixels(height: int) -> float:
@@ -55,6 +55,11 @@ def main() -> None:
     assert isclose(EQUIVALENT_FETCHES_PER_PIXEL, 6.5)
     assert bright_pass(THRESHOLD) == 0.0
     assert isclose(bright_pass(1.0), 1.0)
+    assert bright_pass(0.5, 0.5) == 0.0
+    assert isclose(bright_pass(1.0, 0.5), 1.0)
+    assert bright_pass(0.99, 0.99) == 0.0
+    assert bright_pass(1.0, 1.0) == 0.0
+    assert isclose(bright_pass(0.9, 0.2), 0.875)
     assert isclose(kernel_radius_pixels(1080), 8.0)
     assert isclose(kernel_radius_pixels(1440), 32.0 / 3.0)
     assert isclose(kernel_radius_pixels(2160), 16.0)

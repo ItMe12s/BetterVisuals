@@ -24,7 +24,7 @@ It may also improve the appearance of streams and showcase videos at low to medi
 
 ## Fun stuff
 
-Extra shaders you can mix and match:
+Extra shaders you can mix and customize:
 
 - Bloom
 - Grayscale

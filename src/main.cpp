@@ -40,6 +40,9 @@ namespace {
         AntiAliasingMode aa = AntiAliasingMode::Off;
         bool cas = false;
         bool bloom = false;
+        float bloomThreshold = 0.7f;
+        float bloomIntensity = 0.3f;
+        float bloomRadius = 8.f;
         bool grayscale = false;
         bool pixelate = false;
         bool dithering = false;
@@ -74,6 +77,9 @@ namespace {
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
     std::atomic<bool> g_bloomEnabled = false;
+    std::atomic<float> g_bloomThreshold = 0.7f;
+    std::atomic<float> g_bloomIntensity = 0.3f;
+    std::atomic<float> g_bloomRadius = 8.f;
     std::atomic<bool> g_grayscaleEnabled = false;
     std::atomic<bool> g_pixelateEnabled = false;
     std::atomic<bool> g_ditheringEnabled = false;
@@ -133,11 +139,29 @@ namespace {
         g_casSharpness.store(static_cast<float>(sharpness), std::memory_order_relaxed);
     }
 
+    void updateBloomThreshold(double value) {
+        auto const threshold = std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.7;
+        g_bloomThreshold.store(static_cast<float>(threshold), std::memory_order_relaxed);
+    }
+
+    void updateBloomIntensity(double value) {
+        auto const intensity = std::isfinite(value) ? std::clamp(value, 0.0, 1.5) : 0.3;
+        g_bloomIntensity.store(static_cast<float>(intensity), std::memory_order_relaxed);
+    }
+
+    void updateBloomRadius(double value) {
+        auto const radius = std::isfinite(value) ? std::clamp(value, 0.0, 32.0) : 8.0;
+        g_bloomRadius.store(static_cast<float>(radius), std::memory_order_relaxed);
+    }
+
     PostProcessConfig selectedPostProcessConfig() {
         return {
             g_antiAliasingMode.load(std::memory_order_relaxed),
             g_casEnabled.load(std::memory_order_relaxed),
             g_bloomEnabled.load(std::memory_order_relaxed),
+            g_bloomThreshold.load(std::memory_order_relaxed),
+            g_bloomIntensity.load(std::memory_order_relaxed),
+            g_bloomRadius.load(std::memory_order_relaxed),
             g_grayscaleEnabled.load(std::memory_order_relaxed),
             g_pixelateEnabled.load(std::memory_order_relaxed),
             g_ditheringEnabled.load(std::memory_order_relaxed),
@@ -187,6 +211,11 @@ namespace {
         }
         if (prepared && config.bloom) {
             prepared = g_bloomRenderer.prepare(key.width, key.height);
+            if (prepared) {
+                g_bloomRenderer.setParams(
+                    config.bloomThreshold, config.bloomIntensity, config.bloomRadius
+                );
+            }
         }
         else if (!config.bloom) {
             g_bloomRenderer.reset();
@@ -378,6 +407,21 @@ $on_mod(Loaded) {
     g_bloomEnabled.store(Mod::get()->getSettingValue<bool>("bloom-enabled"), std::memory_order_relaxed);
     listenForSettingChanges<bool>("bloom-enabled", [](bool value) {
         g_bloomEnabled.store(value, std::memory_order_relaxed);
+    });
+
+    updateBloomThreshold(Mod::get()->getSettingValue<double>("bloom-threshold"));
+    listenForSettingChanges<double>("bloom-threshold", [](double value) {
+        updateBloomThreshold(value);
+    });
+
+    updateBloomIntensity(Mod::get()->getSettingValue<double>("bloom-intensity"));
+    listenForSettingChanges<double>("bloom-intensity", [](double value) {
+        updateBloomIntensity(value);
+    });
+
+    updateBloomRadius(Mod::get()->getSettingValue<double>("bloom-radius"));
+    listenForSettingChanges<double>("bloom-radius", [](double value) {
+        updateBloomRadius(value);
     });
 
     g_grayscaleEnabled.store(

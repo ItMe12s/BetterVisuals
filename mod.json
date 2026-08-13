@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "BetterVisuals",
-	"version": "v1.3.1",
+	"version": "v1.4.0",
 	"developer": "imes",
 	"description": "Neat anti-aliasing and post-processing mod.",
 	"tags": [
@@ -71,6 +71,51 @@
 			"name": "Bloom",
 			"description": "Apply a mild bloom glow.",
 			"default": false
+		},
+		"bloom-threshold": {
+			"type": "float",
+			"name": "Bloom Threshold",
+			"description": "Brightness cutoff. Higher means only brighter pixels glow.",
+			"default": 0.7,
+			"min": 0.0,
+			"max": 1.0,
+			"enable-if": "bloom-enabled",
+			"control": {
+				"arrows": true,
+				"arrow-step": 0.05,
+				"slider": true,
+				"slider-step": 0.01
+			}
+		},
+		"bloom-intensity": {
+			"type": "float",
+			"name": "Bloom Intensity",
+			"description": "Strength of the glow over the original image.",
+			"default": 0.3,
+			"min": 0.0,
+			"max": 1.5,
+			"enable-if": "bloom-enabled",
+			"control": {
+				"arrows": true,
+				"arrow-step": 0.05,
+				"slider": true,
+				"slider-step": 0.01
+			}
+		},
+		"bloom-radius": {
+			"type": "float",
+			"name": "Bloom Radius",
+			"description": "Spread of the glow in pixels at 1080p (scales with resolution).",
+			"default": 8.0,
+			"min": 0.0,
+			"max": 32.0,
+			"enable-if": "bloom-enabled",
+			"control": {
+				"arrows": true,
+				"arrow-step": 1.0,
+				"slider": true,
+				"slider-step": 0.5
+			}
 		},
 		"grayscale-enabled": {
 			"type": "bool",

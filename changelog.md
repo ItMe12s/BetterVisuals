@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+- Made bloom customizable
+
 ## 1.3.1
 
 - New metadata for release

@@ -15,16 +15,19 @@ namespace bv::render {
 
         bool prepare(GLsizei width, GLsizei height);
         void apply(GLuint inputTexture, RenderTarget const& target);
+        void setParams(GLfloat threshold, GLfloat intensity, GLfloat radius);
         void reset();
 
     private:
         struct Program {
             GLuint handle = 0;
             GLint offset = -1;
+            GLint param = -1;
         };
 
         bool initialize();
         bool resizeTextures(GLsizei width, GLsizei height);
+        void updateBlurStep();
         void destroyResources();
 
         std::array<Program, 3> m_programs = {};
@@ -37,6 +40,9 @@ namespace bv::render {
         GLsizei m_halfHeight = 0;
         GLfloat m_blurStepX = 0.f;
         GLfloat m_blurStepY = 0.f;
+        GLfloat m_threshold = 0.7f;
+        GLfloat m_intensity = 0.3f;
+        GLfloat m_radiusAt1080p = 8.f;
     };
 
 } // namespace bv::render

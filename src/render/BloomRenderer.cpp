@@ -15,7 +15,6 @@ using namespace geode::prelude;
 namespace {
 
     constexpr GLfloat kBlurKernelRadius = 3.f;
-    constexpr GLfloat kBloomRadiusAt1080p = 8.f;
 
     void configureTexture(GLuint texture) {
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -94,6 +93,14 @@ namespace bv::render {
         glUniform1i(sourceTexture, 0);
         glUniform1i(bloomTexture, 1);
 
+        m_programs[0].param = glGetUniformLocation(m_programs[0].handle, "u_threshold");
+        m_programs[2].param = glGetUniformLocation(m_programs[2].handle, "u_intensity");
+        if (m_programs[0].param < 0 || m_programs[2].param < 0) {
+            log::error("Bloom shaders are missing required parameter uniforms");
+            destroyResources();
+            return false;
+        }
+
         std::array<GLuint, 2> textures = {};
         glGenTextures(static_cast<GLsizei>(textures.size()), textures.data());
         glGenFramebuffers(static_cast<GLsizei>(m_framebuffers.size()), m_framebuffers.data());
@@ -142,16 +149,31 @@ namespace bv::render {
             m_programs[0].offset, 1.f / static_cast<GLfloat>(width), 1.f / static_cast<GLfloat>(height)
         );
 
-        auto const displayScale = static_cast<GLfloat>(height) / 1080.f;
         m_width = width;
         m_height = height;
         m_halfWidth = halfWidth;
         m_halfHeight = halfHeight;
-        m_blurStepX =
-            kBloomRadiusAt1080p * displayScale / (kBlurKernelRadius * static_cast<GLfloat>(width));
-        m_blurStepY =
-            kBloomRadiusAt1080p * displayScale / (kBlurKernelRadius * static_cast<GLfloat>(height));
+        updateBlurStep();
         return true;
+    }
+
+    void BloomRenderer::updateBlurStep() {
+        if (m_width == 0) {
+            return;
+        }
+
+        auto const displayScale = static_cast<GLfloat>(m_height) / 1080.f;
+        m_blurStepX =
+            m_radiusAt1080p * displayScale / (kBlurKernelRadius * static_cast<GLfloat>(m_width));
+        m_blurStepY =
+            m_radiusAt1080p * displayScale / (kBlurKernelRadius * static_cast<GLfloat>(m_height));
+    }
+
+    void BloomRenderer::setParams(GLfloat threshold, GLfloat intensity, GLfloat radius) {
+        m_threshold = threshold;
+        m_intensity = intensity;
+        m_radiusAt1080p = radius;
+        updateBlurStep();
     }
 
     void BloomRenderer::apply(GLuint inputTexture, RenderTarget const& target) {
@@ -161,6 +183,7 @@ namespace bv::render {
         glViewport(0, 0, m_halfWidth, m_halfHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
         glUseProgram(m_programs[0].handle);
+        glUniform1f(m_programs[0].param, m_threshold);
         glBindTexture(GL_TEXTURE_2D, inputTexture);
         FullscreenQuad::draw();
 
@@ -178,6 +201,7 @@ namespace bv::render {
         glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
         glViewport(target.x, target.y, target.width, target.height);
         glUseProgram(m_programs[2].handle);
+        glUniform1f(m_programs[2].param, m_intensity);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputTexture);
         glActiveTexture(GL_TEXTURE1);
