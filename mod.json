@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "BetterVisuals",
-	"version": "v1.4.0",
+	"version": "v1.5.0",
 	"developer": "imes",
 	"description": "Neat anti-aliasing and post-processing mod.",
 	"tags": [
@@ -29,7 +29,7 @@
 		"render-scale": {
 			"type": "float",
 			"name": "Render Scale",
-			"description": "Render at a lower internal resolution, then upscale to the current window size.",
+			"description": "Render at a lower internal resolution, upscale to the current window size.",
 			"default": 1.0,
 			"min": 0.25,
 			"max": 1.0,

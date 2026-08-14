@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0
+
+- Added render scale
+
 ## 1.4.0
 
 - Made bloom customizable and prettier

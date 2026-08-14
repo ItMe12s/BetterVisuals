@@ -1,12 +1,24 @@
 # BetterVisuals
 
-**Also known as:** Less Jagged Edges, Super Secret Settings.
+More FPS or better visuals, up to you!
 
-Makes the game look better while playing levels.
+**Also known as:** Less Jagged Edges, Super Secret Settings.
 
 *May slightly distort text and UI elements.*
 
+## Render Scale
+
+Render the game at lower resolution for more FPS then upscale it.
+
+Available methods:
+
+- Nearest neighbour
+
+Nearest neighbour is the fastest.
+
 ## Anti-aliasing
+
+Makes the game look better while playing levels.
 
 Available methods:
 
