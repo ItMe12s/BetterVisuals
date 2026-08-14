@@ -8,6 +8,7 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
+#include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/CCNode.hpp>
 #include <Geode/platform/cplatform.h>
 #ifdef GEODE_IS_WINDOWS
@@ -61,12 +62,13 @@ namespace {
         PostProcessConfig config;
         GLsizei width = 0;
         GLsizei height = 0;
+        bool needsPresentation = false;
 
         bool operator==(PostProcessKey const&) const = default;
     };
 
     struct PostProcessFailureKey {
-        PostProcessConfig config;
+        PostProcessKey postProcess;
         GLuint framebuffer = 0;
         std::array<GLint, 4> viewport = {};
 
@@ -74,6 +76,7 @@ namespace {
     };
 
     std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
+    std::atomic<float> g_renderScale = 1.f;
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
     std::atomic<bool> g_bloomEnabled = false;
@@ -87,6 +90,7 @@ namespace {
     std::atomic<bool> g_crtEnabled = false;
     bv::render::PostProcessPipeline g_postProcessPipeline;
     bv::render::PostProcessRenderer g_fxaaRenderer;
+    bv::render::PostProcessRenderer g_renderScaleRenderer;
     bv::render::PostProcessRenderer g_casRenderer;
     bv::render::BloomRenderer g_bloomRenderer;
     bv::render::PostProcessRenderer g_grayscaleRenderer;
@@ -98,10 +102,20 @@ namespace {
     std::optional<PostProcessKey> g_preparedPostProcessKey;
     std::optional<PostProcessFailureKey> g_failedPostProcessKey;
     bool g_isRootSceneVisitActive = false;
+    bool g_isSceneCaptureActive = false;
+    GLsizei g_captureWidth = 0;
+    GLsizei g_captureHeight = 0;
+
+    void applyCaptureViewport() {
+        if (g_isSceneCaptureActive) {
+            glViewport(0, 0, g_captureWidth, g_captureHeight);
+        }
+    }
 
     void resetRenderResources() {
         g_postProcessPipeline.reset();
         g_fxaaRenderer.reset();
+        g_renderScaleRenderer.reset();
         g_casRenderer.reset();
         g_bloomRenderer.reset();
         g_grayscaleRenderer.reset();
@@ -132,6 +146,44 @@ namespace {
             log::warn("Unknown AA mode '{}', disabling AA", value);
         }
         g_antiAliasingMode.store(AntiAliasingMode::Off, std::memory_order_relaxed);
+    }
+
+    void updateRenderScale(double value) {
+        auto const scale = std::isfinite(value) ? std::clamp(value, 0.25, 1.0) : 1.0;
+        g_renderScale.store(static_cast<float>(scale), std::memory_order_relaxed);
+    }
+
+    GLsizei scaledDimension(GLsizei output, float scale) {
+        return static_cast<GLsizei>(
+            std::max<long>(1, std::lround(static_cast<double>(output) * scale))
+        );
+    }
+
+    std::array<GLint, 4> scaledScissorBox(
+        std::array<GLint, 4> const& box, std::array<GLint, 4> const& viewport, GLsizei width,
+        GLsizei height
+    ) {
+        auto mapStart = [](GLint value, GLint origin, GLsizei internalSize, GLsizei outputSize) {
+            return static_cast<GLint>(
+                std::floor(static_cast<double>(value - origin) * internalSize / outputSize)
+            );
+        };
+        auto mapEnd = [](GLint value, GLint origin, GLsizei internalSize, GLsizei outputSize) {
+            return static_cast<GLint>(
+                std::ceil(static_cast<double>(value - origin) * internalSize / outputSize)
+            );
+        };
+
+        auto const left = mapStart(box[0], viewport[0], width, viewport[2]);
+        auto const bottom = mapStart(box[1], viewport[1], height, viewport[3]);
+        auto const right = mapEnd(box[0] + box[2], viewport[0], width, viewport[2]);
+        auto const top = mapEnd(box[1] + box[3], viewport[1], height, viewport[3]);
+        return {
+            left,
+            bottom,
+            std::max<GLint>(0, right - left),
+            std::max<GLint>(0, top - bottom),
+        };
     }
 
     void updateCasSharpness(double value) {
@@ -254,6 +306,14 @@ namespace {
             g_crtRenderer.reset();
         }
 
+        if (prepared && key.needsPresentation) {
+            prepared =
+                g_renderScaleRenderer.prepare(bv::shaders::kRenderScaleShader, key.width, key.height);
+        }
+        else if (!key.needsPresentation) {
+            g_renderScaleRenderer.reset();
+        }
+
         if (prepared) {
             g_preparedPostProcessKey = key;
         }
@@ -262,24 +322,17 @@ namespace {
 
     void renderEffects(
         PostProcessConfig const& config, GLfloat casSharpness,
-        bv::render::RenderTarget const& frameTarget
+        bv::render::RenderTarget const& frameTarget, bool needsPresentation
     ) {
         auto remaining = config.effectCount();
         assert(remaining > 0);
 
-        glDisable(GL_BLEND);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_SCISSOR_TEST);
-        glDisable(GL_CULL_FACE);
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        g_postProcessPipeline.bindQuad();
-
         auto runStage = [&](auto&& render) {
             auto const terminal = --remaining == 0;
-            auto const target = terminal ? frameTarget : g_postProcessPipeline.nextTarget();
+            auto const writeToCaller = terminal && !needsPresentation;
+            auto const target = writeToCaller ? frameTarget : g_postProcessPipeline.nextTarget();
             render(target);
-            if (!terminal) {
+            if (!writeToCaller) {
                 g_postProcessPipeline.advanceStage();
             }
         };
@@ -331,7 +384,23 @@ namespace {
 
     void renderSceneWithPostProcessing(auto&& visitNext) {
         auto const config = selectedPostProcessConfig();
-        if (config.effectCount() == 0) {
+        GLint callerFramebuffer = 0;
+        std::array<GLint, 4> callerViewport = {};
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &callerFramebuffer);
+        glGetIntegerv(GL_VIEWPORT, callerViewport.data());
+        auto const width = static_cast<GLsizei>(callerViewport[2]);
+        auto const height = static_cast<GLsizei>(callerViewport[3]);
+        if (width <= 0 || height <= 0) {
+            visitNext();
+            return;
+        }
+
+        auto const effectCount = config.effectCount();
+        auto const renderScale = g_renderScale.load(std::memory_order_relaxed);
+        auto const internalWidth = scaledDimension(width, renderScale);
+        auto const internalHeight = scaledDimension(height, renderScale);
+        auto const needsScalePresentation = internalWidth != width || internalHeight != height;
+        if (effectCount == 0 && !needsScalePresentation) {
             if (g_preparedPostProcessKey || g_failedPostProcessKey) {
                 resetRenderResources();
             }
@@ -339,28 +408,26 @@ namespace {
             return;
         }
 
-        GLint callerFramebuffer = 0;
-        std::array<GLint, 4> callerViewport = {};
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &callerFramebuffer);
-        glGetIntegerv(GL_VIEWPORT, callerViewport.data());
-        auto const width = static_cast<GLsizei>(callerViewport[2]);
-        auto const height = static_cast<GLsizei>(callerViewport[3]);
-        PostProcessKey const key{config, width, height};
+        auto const scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        std::array<GLint, 4> callerScissor = {};
+        glGetIntegerv(GL_SCISSOR_BOX, callerScissor.data());
+        auto const needsPresentation = needsScalePresentation;
+
+        PostProcessKey const key{config, internalWidth, internalHeight, needsPresentation};
         PostProcessFailureKey const failureKey{
-            config,
+            key,
             static_cast<GLuint>(callerFramebuffer),
             callerViewport,
         };
 
-        if (width <= 0 || height <= 0 ||
-            (g_failedPostProcessKey && *g_failedPostProcessKey == failureKey)) {
+        if (g_failedPostProcessKey && *g_failedPostProcessKey == failureKey) {
             visitNext();
             return;
         }
         if (!preparePostProcess(key)) {
             resetRenderResources();
             g_failedPostProcessKey = failureKey;
-            log::error("Post-processing disabled for this configuration");
+            log::warn("Post-processing disabled for this configuration");
             visitNext();
             return;
         }
@@ -374,12 +441,48 @@ namespace {
         };
 
         g_postProcessPipeline.beginSceneCapture();
+        if (scissorEnabled == GL_TRUE) {
+            auto const scissor =
+                scaledScissorBox(callerScissor, callerViewport, internalWidth, internalHeight);
+            glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+        }
+        g_isSceneCaptureActive = true;
+        g_captureWidth = internalWidth;
+        g_captureHeight = internalHeight;
         visitNext();
+        g_isSceneCaptureActive = false;
+
         {
             bv::render::GlStateGuard postSceneState;
-            renderEffects(
-                config, config.cas ? g_casSharpness.load(std::memory_order_relaxed) : 0.f, callerTarget
-            );
+            glDisable(GL_BLEND);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_STENCIL_TEST);
+            glDisable(GL_SCISSOR_TEST);
+            glDisable(GL_CULL_FACE);
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            g_postProcessPipeline.bindQuad();
+
+            if (effectCount > 0) {
+                renderEffects(
+                    config,
+                    config.cas ? g_casSharpness.load(std::memory_order_relaxed) : 0.f,
+                    callerTarget,
+                    needsPresentation
+                );
+            }
+
+            if (needsPresentation) {
+                auto const sourceTexture = g_postProcessPipeline.currentTexture();
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, sourceTexture);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glBindFramebuffer(GL_FRAMEBUFFER, callerTarget.framebuffer);
+                glViewport(callerTarget.x, callerTarget.y, callerTarget.width, callerTarget.height);
+                g_renderScaleRenderer.apply(sourceTexture);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            }
         }
         glBindFramebuffer(GL_FRAMEBUFFER, callerTarget.framebuffer);
         glViewport(callerTarget.x, callerTarget.y, callerTarget.width, callerTarget.height);
@@ -389,6 +492,11 @@ namespace {
 } // namespace
 
 $on_mod(Loaded) {
+    updateRenderScale(Mod::get()->getSettingValue<double>("render-scale"));
+    listenForSettingChanges<double>("render-scale", [](double value) {
+        updateRenderScale(value);
+    });
+
     updateAntiAliasingMode(Mod::get()->getSettingValue<std::string_view>("aa-mode"));
     listenForSettingChanges<std::string_view>("aa-mode", [](std::string_view value) {
         updateAntiAliasingMode(value);
@@ -455,6 +563,25 @@ $on_mod(Loaded) {
         g_crtEnabled.store(value, std::memory_order_relaxed);
     });
 }
+
+class $modify(BetterVisualsDirectorHook, CCDirector) {
+    void setProjection(ccDirectorProjection kProjection) {
+        CCDirector::setProjection(kProjection);
+        applyCaptureViewport();
+    }
+
+    void setViewport() {
+        CCDirector::setViewport();
+        applyCaptureViewport();
+    }
+};
+
+class $modify(BetterVisualsEGLViewHook, CCEGLView) {
+    void setViewPortInPoints(float x, float y, float w, float h) {
+        CCEGLView::setViewPortInPoints(x, y, w, h);
+        applyCaptureViewport();
+    }
+};
 
 class $modify(BetterVisualsSceneVisitHook, CCNode) {
     static void onModify(auto& self) {

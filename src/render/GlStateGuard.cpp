@@ -64,6 +64,7 @@ namespace bv::render {
 
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &state.arrayBuffer);
         glGetIntegerv(GL_VIEWPORT, state.viewport.data());
+        glGetIntegerv(GL_SCISSOR_BOX, state.scissorBox.data());
         glGetFloatv(GL_COLOR_CLEAR_VALUE, state.clearColor.data());
         glGetBooleanv(GL_COLOR_WRITEMASK, state.colorMask.data());
         state.blend = glIsEnabled(GL_BLEND);
@@ -95,6 +96,7 @@ namespace bv::render {
         glBindFramebuffer(GL_FRAMEBUFFER, state.framebuffer);
         glBindRenderbuffer(GL_RENDERBUFFER, state.renderbuffer);
         glViewport(state.viewport[0], state.viewport[1], state.viewport[2], state.viewport[3]);
+        glScissor(state.scissorBox[0], state.scissorBox[1], state.scissorBox[2], state.scissorBox[3]);
         glClearColor(
             state.clearColor[0], state.clearColor[1], state.clearColor[2], state.clearColor[3]
         );

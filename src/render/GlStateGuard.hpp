@@ -23,6 +23,7 @@ namespace bv::render {
         std::array<GLint, 3> textures2D = {};
         GLint arrayBuffer = 0;
         std::array<GLint, 4> viewport = {};
+        std::array<GLint, 4> scissorBox = {};
         std::array<GLfloat, 4> clearColor = {};
         std::array<GLboolean, 4> colorMask = {};
         GLboolean blend = GL_FALSE;
