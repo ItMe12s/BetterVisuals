@@ -10,7 +10,9 @@
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/CCNode.hpp>
+#include <Geode/modify/MenuLayer.hpp>
 #include <Geode/platform/cplatform.h>
+#include <Geode/ui/Popup.hpp>
 #ifdef GEODE_IS_WINDOWS
     #include <Geode/modify/CCEGLView.hpp>
 #endif
@@ -95,6 +97,8 @@ namespace {
     std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
+    std::atomic<bool> g_temporarilyDisabled = false;
+    std::atomic<bool> g_disablePopupShown = false;
     bv::render::PostProcessPipeline g_postProcessPipeline;
     bv::render::PostProcessRenderer g_fxaaRenderer;
     bv::render::PostProcessRenderer g_renderScaleRenderer;
@@ -631,7 +635,7 @@ class $modify(BetterVisualsSceneVisitHook, CCNode) {
     }
 
     void visit() {
-        if (g_isRootSceneVisitActive ||
+        if (g_temporarilyDisabled.load(std::memory_order_relaxed) || g_isRootSceneVisitActive ||
             static_cast<CCNode*>(this) != CCDirector::get()->getRunningScene()) {
             CCNode::visit();
             return;
@@ -648,11 +652,35 @@ class $modify(BetterVisualsSceneVisitHook, CCNode) {
 #ifdef GEODE_IS_WINDOWS
 class $modify(BetterVisualsEGLView, CCEGLView) {
     void toggleFullScreen(bool value, bool borderless, bool fix) {
-        resetRenderResources();
+        if (!g_temporarilyDisabled.exchange(true)) {
+            resetRenderResources();
+        }
         CCEGLView::toggleFullScreen(value, borderless, fix);
     }
 };
 #endif
+
+class $modify(BetterVisualsMenuLayer, MenuLayer) {
+    bool init() {
+        if (!MenuLayer::init()) return false;
+
+        if (g_temporarilyDisabled.load(std::memory_order_relaxed) &&
+            !g_disablePopupShown.exchange(true)) {
+            queueInMainThread([] {
+                createQuickPopup(
+                    "BetterVisuals",
+                    "BetterVisuals temporary disabled."
+                    " Please restart the game to keep fullscreen/windowed mode."
+                    " Sorry for the inconvenience!",
+                    "OK",
+                    nullptr,
+                    [](FLAlertLayer*, bool) {}
+                );
+            });
+        }
+        return true;
+    }
+};
 
 #ifdef GEODE_IS_MOBILE
 class $modify(BetterVisualsAppDelegate, AppDelegate) {

@@ -2,7 +2,8 @@
 
 ## 1.6.1
 
-add stuff here...
+- Fixed crash on windows when changing fullscreen/windowed mode
+- Optimized bloom
 
 ## 1.6.0
 

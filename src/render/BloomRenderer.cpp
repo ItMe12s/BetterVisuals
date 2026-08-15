@@ -15,6 +15,7 @@ using namespace geode::prelude;
 namespace {
 
     constexpr GLfloat kBlurKernelRadius = 3.f;
+    constexpr GLfloat kBlurWideStep = 1.41421356f;
 
     void configureTexture(GLuint texture) {
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -163,10 +164,10 @@ namespace bv::render {
         }
 
         auto const displayScale = static_cast<GLfloat>(m_height) / 1080.f;
-        m_blurStepX =
-            m_radiusAt1080p * displayScale / (kBlurKernelRadius * static_cast<GLfloat>(m_width));
-        m_blurStepY =
-            m_radiusAt1080p * displayScale / (kBlurKernelRadius * static_cast<GLfloat>(m_height));
+        m_blurStepX = m_radiusAt1080p * displayScale /
+            (kBlurKernelRadius * static_cast<GLfloat>(m_width)) * kBlurWideStep;
+        m_blurStepY = m_radiusAt1080p * displayScale /
+            (kBlurKernelRadius * static_cast<GLfloat>(m_height)) * kBlurWideStep;
     }
 
     void BloomRenderer::setParams(GLfloat threshold, GLfloat intensity, GLfloat radius) {
@@ -189,16 +190,6 @@ namespace bv::render {
 
         glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[1]);
         glUseProgram(m_programs[1].handle);
-        glUniform2f(m_programs[1].offset, m_blurStepX, 0.f);
-        glBindTexture(GL_TEXTURE_2D, m_bloomTexture);
-        FullscreenQuad::draw();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[0]);
-        glUniform2f(m_programs[1].offset, 0.f, m_blurStepY);
-        glBindTexture(GL_TEXTURE_2D, m_horizontalTexture);
-        FullscreenQuad::draw();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffers[1]);
         glUniform2f(m_programs[1].offset, m_blurStepX, 0.f);
         glBindTexture(GL_TEXTURE_2D, m_bloomTexture);
         FullscreenQuad::draw();

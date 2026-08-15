@@ -34,11 +34,19 @@ uniform vec2 u_texelStep;
 varying vec2 v_texCoord;
 
 void main() {
-    vec3 bloom = texture2D(u_texture, v_texCoord).rgb * 0.216106;
-    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 1.40733).rgb * 0.321788;
-    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 1.40733).rgb * 0.321788;
-    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 3.0).rgb * 0.070159;
-    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 3.0).rgb * 0.070159;
+    vec3 bloom = texture2D(u_texture, v_texCoord).rgb * 0.121569;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep).rgb * 0.116706;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep).rgb * 0.116706;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 2.0).rgb * 0.103256;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 2.0).rgb * 0.103256;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 3.0).rgb * 0.084195;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 3.0).rgb * 0.084195;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 4.0).rgb * 0.063270;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 4.0).rgb * 0.063270;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 5.0).rgb * 0.043819;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 5.0).rgb * 0.043819;
+    bloom += texture2D(u_texture, v_texCoord - u_texelStep * 6.0).rgb * 0.027969;
+    bloom += texture2D(u_texture, v_texCoord + u_texelStep * 6.0).rgb * 0.027969;
     gl_FragColor = vec4(bloom, 1.0);
 }
 )glsl";
