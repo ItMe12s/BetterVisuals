@@ -9,7 +9,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCDirector.hpp>
-#include <Geode/modify/CCNode.hpp>
+#include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/platform/cplatform.h>
 #include <Geode/ui/Popup.hpp>
@@ -113,7 +113,7 @@ namespace {
     bv::render::SmaaRenderer g_smaaRenderer;
     std::optional<PostProcessKey> g_preparedPostProcessKey;
     std::optional<PostProcessFailureKey> g_failedPostProcessKey;
-    bool g_isRootSceneVisitActive = false;
+    bool g_isGameLayerVisitActive = false;
     bool g_isSceneCaptureActive = false;
     GLsizei g_captureWidth = 0;
     GLsizei g_captureHeight = 0;
@@ -629,25 +629,25 @@ class $modify(BetterVisualsEGLViewHook, CCEGLView) {
 };
 #endif
 
-class $modify(BetterVisualsSceneVisitHook, CCNode) {
+class $modify(BetterVisualsGameLayer, GJBaseGameLayer) {
     static void onModify(auto& self) {
-        if (!self.setHookPriorityPre("cocos2d::CCNode::visit", Priority::VeryLate)) {
-            log::warn("Unable to set CCNode::visit hook priority");
+        if (!self.setHookPriorityPre("GJBaseGameLayer::visit", Priority::VeryLate)) {
+            log::warn("Unable to set GJBaseGameLayer::visit hook priority");
         }
     }
 
     void visit() {
-        if (g_temporarilyDisabled.load(std::memory_order_relaxed) || g_isRootSceneVisitActive ||
-            static_cast<CCNode*>(this) != CCDirector::get()->getRunningScene()) {
-            CCNode::visit();
+        if (g_temporarilyDisabled.load(std::memory_order_relaxed) || g_isGameLayerVisitActive ||
+            static_cast<GJBaseGameLayer*>(this) != GJBaseGameLayer::get()) {
+            GJBaseGameLayer::visit();
             return;
         }
 
-        g_isRootSceneVisitActive = true;
+        g_isGameLayerVisitActive = true;
         renderSceneWithPostProcessing([this] {
-            CCNode::visit();
+            GJBaseGameLayer::visit();
         });
-        g_isRootSceneVisitActive = false;
+        g_isGameLayerVisitActive = false;
     }
 };
 

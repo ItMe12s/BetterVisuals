@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.2
+
+- The mod now only works while in a level and the editor
+
 ## 1.6.1
 
 - Fixed crash when changing fullscreen/windowed mode
