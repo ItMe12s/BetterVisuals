@@ -536,13 +536,13 @@ $on_mod(Loaded) {
         updateRenderScale(value);
     });
 
-    updateUpscaleMethod(Mod::get()->getSettingValue<std::string_view>("upscale-method"));
-    listenForSettingChanges<std::string_view>("upscale-method", [](std::string_view value) {
+    updateUpscaleMethod(Mod::get()->getSettingValue<std::string>("upscale-method"));
+    listenForSettingChanges<std::string>("upscale-method", [](std::string value) {
         updateUpscaleMethod(value);
     });
 
-    updateAntiAliasingMethod(Mod::get()->getSettingValue<std::string_view>("aa-method"));
-    listenForSettingChanges<std::string_view>("aa-method", [](std::string_view value) {
+    updateAntiAliasingMethod(Mod::get()->getSettingValue<std::string>("aa-method"));
+    listenForSettingChanges<std::string>("aa-method", [](std::string value) {
         updateAntiAliasingMethod(value);
     });
 
