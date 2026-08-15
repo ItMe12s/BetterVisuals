@@ -4,17 +4,27 @@ More FPS or better visuals, up to you!
 
 **Also known as:** Less Jagged Edges, Super Secret Settings.
 
-*May slightly distort text and UI elements.*
+Recommended settings:
+
+- `Max FPS`: 0.5x + Nearest, AA off, Sharpening off.
+- `Better FPS`: 0.7x + FSR 1, AA off, Sharpening off.
+- `Better Visuals`: 1x, SMAA High, Sharpening off.
+- `Stream/Record`: 1x, SMAA High, Sharpening on.
+- `YT Showcase`: 1x, SMAA Ultra, Sharpening on.
+
+*May distort text and UI elements.*
 
 ## Render Scale
 
-Render the game at lower resolution for more FPS then upscale it.
+Render the game at lower resolution for faster rendering then upscale it.
 
 Available methods:
 
 - Nearest neighbour
+- AMD FidelityFX FSR 1 (EASU)
 
 Nearest neighbour is the fastest.
+FSR 1 produces sharper edges while upscaling with a small performance cost.
 
 ## Anti-aliasing
 
@@ -54,3 +64,11 @@ Join the Discord server or open a GitHub issue/feature request!
 Framebuffer and VBO handling referenced from [DevTools](https://github.com/geode-sdk/DevTools).
 
 Other credits, citations, and licenses can be found in the mod's source code
+
+## Quotes I got while making the mod
+
+"Finally I can play at 1000 FPS (I use a 200Hz screen)"
+
+"works perfectly thanks !! /Unlisted YouTube GD showcase/"
+
+"No phone overheat after the upscale update"

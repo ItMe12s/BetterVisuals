@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0
+
+- Added AMD FidelityFX FSR 1 (EASU) as an upscale method
+
 ## 1.5.0
 
 - Added render scale

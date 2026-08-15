@@ -30,15 +30,20 @@ using namespace geode::prelude;
 
 namespace {
 
-    enum class AntiAliasingMode {
+    enum class AntiAliasingMethod {
         Off,
         Fxaa,
         SmaaHigh,
         SmaaUltra,
     };
 
+    enum class UpscaleMethod {
+        Nearest,
+        Fsr,
+    };
+
     struct PostProcessConfig {
-        AntiAliasingMode aa = AntiAliasingMode::Off;
+        AntiAliasingMethod aa = AntiAliasingMethod::Off;
         bool cas = false;
         bool bloom = false;
         float bloomThreshold = 0.7f;
@@ -49,12 +54,13 @@ namespace {
         bool dithering = false;
         bool vhs = false;
         bool crt = false;
+        UpscaleMethod upscaling = UpscaleMethod::Nearest;
 
         bool operator==(PostProcessConfig const&) const = default;
 
         int effectCount() const {
-            return (aa != AntiAliasingMode::Off) + cas + bloom + grayscale + pixelate + dithering +
-                vhs + crt;
+            return (aa != AntiAliasingMethod::Off) + cas + bloom + grayscale + pixelate +
+                dithering + vhs + crt;
         }
     };
 
@@ -75,7 +81,8 @@ namespace {
         bool operator==(PostProcessFailureKey const&) const = default;
     };
 
-    std::atomic<AntiAliasingMode> g_antiAliasingMode = AntiAliasingMode::SmaaHigh;
+    std::atomic<AntiAliasingMethod> g_antiAliasingMethod = AntiAliasingMethod::SmaaHigh;
+    std::atomic<UpscaleMethod> g_upscaleMethod = UpscaleMethod::Nearest;
     std::atomic<float> g_renderScale = 1.f;
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
@@ -91,6 +98,7 @@ namespace {
     bv::render::PostProcessPipeline g_postProcessPipeline;
     bv::render::PostProcessRenderer g_fxaaRenderer;
     bv::render::PostProcessRenderer g_renderScaleRenderer;
+    bv::render::PostProcessRenderer g_fsrRenderer;
     bv::render::PostProcessRenderer g_casRenderer;
     bv::render::BloomRenderer g_bloomRenderer;
     bv::render::PostProcessRenderer g_grayscaleRenderer;
@@ -116,6 +124,7 @@ namespace {
         g_postProcessPipeline.reset();
         g_fxaaRenderer.reset();
         g_renderScaleRenderer.reset();
+        g_fsrRenderer.reset();
         g_casRenderer.reset();
         g_bloomRenderer.reset();
         g_grayscaleRenderer.reset();
@@ -128,29 +137,41 @@ namespace {
         g_failedPostProcessKey.reset();
     }
 
-    void updateAntiAliasingMode(std::string_view value) {
+    void updateAntiAliasingMethod(std::string_view value) {
         if (value == "SMAA High") {
-            g_antiAliasingMode.store(AntiAliasingMode::SmaaHigh, std::memory_order_relaxed);
+            g_antiAliasingMethod.store(AntiAliasingMethod::SmaaHigh, std::memory_order_relaxed);
             return;
         }
         if (value == "SMAA Ultra") {
-            g_antiAliasingMode.store(AntiAliasingMode::SmaaUltra, std::memory_order_relaxed);
+            g_antiAliasingMethod.store(AntiAliasingMethod::SmaaUltra, std::memory_order_relaxed);
             return;
         }
         if (value == "FXAA") {
-            g_antiAliasingMode.store(AntiAliasingMode::Fxaa, std::memory_order_relaxed);
+            g_antiAliasingMethod.store(AntiAliasingMethod::Fxaa, std::memory_order_relaxed);
             return;
         }
 
         if (value != "Off") {
-            log::warn("Unknown AA mode '{}', disabling AA", value);
+            log::warn("Unknown AA method '{}', disabling AA", value);
         }
-        g_antiAliasingMode.store(AntiAliasingMode::Off, std::memory_order_relaxed);
+        g_antiAliasingMethod.store(AntiAliasingMethod::Off, std::memory_order_relaxed);
     }
 
     void updateRenderScale(double value) {
         auto const scale = std::isfinite(value) ? std::clamp(value, 0.25, 1.0) : 1.0;
         g_renderScale.store(static_cast<float>(scale), std::memory_order_relaxed);
+    }
+
+    void updateUpscaleMethod(std::string_view value) {
+        if (value == "FSR 1") {
+            g_upscaleMethod.store(UpscaleMethod::Fsr, std::memory_order_relaxed);
+            return;
+        }
+
+        if (value != "Nearest") {
+            log::warn("Unknown upscale method '{}', using nearest neighbour", value);
+        }
+        g_upscaleMethod.store(UpscaleMethod::Nearest, std::memory_order_relaxed);
     }
 
     GLsizei scaledDimension(GLsizei output, float scale) {
@@ -208,7 +229,7 @@ namespace {
 
     PostProcessConfig selectedPostProcessConfig() {
         return {
-            g_antiAliasingMode.load(std::memory_order_relaxed),
+            g_antiAliasingMethod.load(std::memory_order_relaxed),
             g_casEnabled.load(std::memory_order_relaxed),
             g_bloomEnabled.load(std::memory_order_relaxed),
             g_bloomThreshold.load(std::memory_order_relaxed),
@@ -219,6 +240,7 @@ namespace {
             g_ditheringEnabled.load(std::memory_order_relaxed),
             g_vhsEnabled.load(std::memory_order_relaxed),
             g_crtEnabled.load(std::memory_order_relaxed),
+            g_upscaleMethod.load(std::memory_order_relaxed),
         };
     }
 
@@ -231,26 +253,26 @@ namespace {
         auto const& config = key.config;
         bool prepared = g_postProcessPipeline.prepare(key.width, key.height);
         switch (config.aa) {
-            case AntiAliasingMode::Fxaa:
+            case AntiAliasingMethod::Fxaa:
                 g_smaaRenderer.reset();
                 prepared = prepared &&
                     g_fxaaRenderer.prepare(bv::shaders::kFxaaShader, key.width, key.height);
                 break;
-            case AntiAliasingMode::SmaaHigh:
+            case AntiAliasingMethod::SmaaHigh:
                 g_fxaaRenderer.reset();
                 prepared = prepared &&
                     g_smaaRenderer.prepare(
                         bv::shaders::smaa::kSmaaHighShaderSet, key.width, key.height
                     );
                 break;
-            case AntiAliasingMode::SmaaUltra:
+            case AntiAliasingMethod::SmaaUltra:
                 g_fxaaRenderer.reset();
                 prepared = prepared &&
                     g_smaaRenderer.prepare(
                         bv::shaders::smaa::kSmaaUltraShaderSet, key.width, key.height
                     );
                 break;
-            case AntiAliasingMode::Off:
+            case AntiAliasingMethod::Off:
                 g_fxaaRenderer.reset();
                 g_smaaRenderer.reset();
                 break;
@@ -307,11 +329,20 @@ namespace {
         }
 
         if (prepared && key.needsPresentation) {
-            prepared =
-                g_renderScaleRenderer.prepare(bv::shaders::kRenderScaleShader, key.width, key.height);
+            if (config.upscaling == UpscaleMethod::Fsr) {
+                g_renderScaleRenderer.reset();
+                prepared = g_fsrRenderer.prepare(bv::shaders::kFsrShader, key.width, key.height);
+            }
+            else {
+                g_fsrRenderer.reset();
+                prepared = g_renderScaleRenderer.prepare(
+                    bv::shaders::kRenderScaleShader, key.width, key.height
+                );
+            }
         }
         else if (!key.needsPresentation) {
             g_renderScaleRenderer.reset();
+            g_fsrRenderer.reset();
         }
 
         if (prepared) {
@@ -345,14 +376,14 @@ namespace {
         };
 
         switch (config.aa) {
-            case AntiAliasingMode::Fxaa: runPost(g_fxaaRenderer); break;
-            case AntiAliasingMode::SmaaHigh:
-            case AntiAliasingMode::SmaaUltra:
+            case AntiAliasingMethod::Fxaa: runPost(g_fxaaRenderer); break;
+            case AntiAliasingMethod::SmaaHigh:
+            case AntiAliasingMethod::SmaaUltra:
                 runStage([&](bv::render::RenderTarget const& target) {
                     g_smaaRenderer.apply(g_postProcessPipeline.currentTexture(), target);
                 });
                 break;
-            case AntiAliasingMode::Off: break;
+            case AntiAliasingMethod::Off: break;
         }
         if (config.cas) {
             runPost(g_casRenderer, casSharpness);
@@ -399,8 +430,8 @@ namespace {
         auto const renderScale = g_renderScale.load(std::memory_order_relaxed);
         auto const internalWidth = scaledDimension(width, renderScale);
         auto const internalHeight = scaledDimension(height, renderScale);
-        auto const needsScalePresentation = internalWidth != width || internalHeight != height;
-        if (effectCount == 0 && !needsScalePresentation) {
+        auto const needsPresentation = internalWidth != width || internalHeight != height;
+        if (effectCount == 0 && !needsPresentation) {
             if (g_preparedPostProcessKey || g_failedPostProcessKey) {
                 resetRenderResources();
             }
@@ -411,7 +442,6 @@ namespace {
         auto const scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
         std::array<GLint, 4> callerScissor = {};
         glGetIntegerv(GL_SCISSOR_BOX, callerScissor.data());
-        auto const needsPresentation = needsScalePresentation;
 
         PostProcessKey const key{config, internalWidth, internalHeight, needsPresentation};
         PostProcessFailureKey const failureKey{
@@ -479,7 +509,12 @@ namespace {
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glBindFramebuffer(GL_FRAMEBUFFER, callerTarget.framebuffer);
                 glViewport(callerTarget.x, callerTarget.y, callerTarget.width, callerTarget.height);
-                g_renderScaleRenderer.apply(sourceTexture);
+                if (config.upscaling == UpscaleMethod::Fsr) {
+                    g_fsrRenderer.apply(sourceTexture);
+                }
+                else {
+                    g_renderScaleRenderer.apply(sourceTexture);
+                }
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             }
@@ -497,9 +532,14 @@ $on_mod(Loaded) {
         updateRenderScale(value);
     });
 
-    updateAntiAliasingMode(Mod::get()->getSettingValue<std::string_view>("aa-mode"));
-    listenForSettingChanges<std::string_view>("aa-mode", [](std::string_view value) {
-        updateAntiAliasingMode(value);
+    updateUpscaleMethod(Mod::get()->getSettingValue<std::string_view>("upscale-method"));
+    listenForSettingChanges<std::string_view>("upscale-method", [](std::string_view value) {
+        updateUpscaleMethod(value);
+    });
+
+    updateAntiAliasingMethod(Mod::get()->getSettingValue<std::string_view>("aa-method"));
+    listenForSettingChanges<std::string_view>("aa-method", [](std::string_view value) {
+        updateAntiAliasingMethod(value);
     });
 
     g_casEnabled.store(Mod::get()->getSettingValue<bool>("cas-enabled"), std::memory_order_relaxed);

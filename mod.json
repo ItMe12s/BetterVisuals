@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "BetterVisuals",
-	"version": "v1.5.0",
+	"version": "v1.6.0",
 	"developer": "imes",
 	"description": "Neat anti-aliasing and post-processing mod.",
 	"tags": [
@@ -40,14 +40,24 @@
 				"slider-step": 0.01
 			}
 		},
+		"upscale-method": {
+			"type": "string",
+			"name": "Upscale Method",
+			"description": "How the game is scaled back up. Turn off automatically at 1x scale.",
+			"default": "FSR 1",
+			"one-of": [
+				"Nearest",
+				"FSR 1"
+			]
+		},
 		"aa-title": {
 			"type": "title",
 			"name": "Anti-aliasing"
 		},
-		"aa-mode": {
+		"aa-method": {
 			"type": "string",
-			"name": "AA Mode",
-			"description": "Fullscreen (whole game window) anti-aliasing mode.",
+			"name": "AA Method",
+			"description": "Fullscreen (whole game window) anti-aliasing method.",
 			"default": "SMAA High",
 			"one-of": [
 				"Off",

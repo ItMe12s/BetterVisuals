@@ -25,5 +25,6 @@ void main() {
     extern render::PostProcessShader const kVhsShader;
     extern render::PostProcessShader const kCrtShader;
     extern render::PostProcessShader const kRenderScaleShader;
+    extern render::PostProcessShader const kFsrShader;
 
 } // namespace bv::shaders
