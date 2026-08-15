@@ -620,12 +620,14 @@ class $modify(BetterVisualsDirectorHook, CCDirector) {
     }
 };
 
+#ifdef GEODE_IS_WINDOWS
 class $modify(BetterVisualsEGLViewHook, CCEGLView) {
     void setViewPortInPoints(float x, float y, float w, float h) {
         CCEGLView::setViewPortInPoints(x, y, w, h);
         applyCaptureViewport();
     }
 };
+#endif
 
 class $modify(BetterVisualsSceneVisitHook, CCNode) {
     static void onModify(auto& self) {
