@@ -97,6 +97,8 @@ namespace {
     std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
+    std::atomic<bool> g_modEnabled = true;
+    std::atomic<bool> g_funEnabled = true;
     std::atomic<bool> g_temporarilyDisabled = false;
     std::atomic<bool> g_disablePopupShown = false;
     bv::render::PostProcessPipeline g_postProcessPipeline;
@@ -232,18 +234,19 @@ namespace {
     }
 
     PostProcessConfig selectedPostProcessConfig() {
+        bool const fun = g_funEnabled.load(std::memory_order_relaxed);
         return {
             g_antiAliasingMethod.load(std::memory_order_relaxed),
             g_casEnabled.load(std::memory_order_relaxed),
-            g_bloomEnabled.load(std::memory_order_relaxed),
+            fun && g_bloomEnabled.load(std::memory_order_relaxed),
             g_bloomThreshold.load(std::memory_order_relaxed),
             g_bloomIntensity.load(std::memory_order_relaxed),
             g_bloomRadius.load(std::memory_order_relaxed),
-            g_grayscaleEnabled.load(std::memory_order_relaxed),
-            g_pixelateEnabled.load(std::memory_order_relaxed),
-            g_ditheringEnabled.load(std::memory_order_relaxed),
-            g_vhsEnabled.load(std::memory_order_relaxed),
-            g_crtEnabled.load(std::memory_order_relaxed),
+            fun && g_grayscaleEnabled.load(std::memory_order_relaxed),
+            fun && g_pixelateEnabled.load(std::memory_order_relaxed),
+            fun && g_ditheringEnabled.load(std::memory_order_relaxed),
+            fun && g_vhsEnabled.load(std::memory_order_relaxed),
+            fun && g_crtEnabled.load(std::memory_order_relaxed),
             g_upscaleMethod.load(std::memory_order_relaxed),
         };
     }
@@ -531,6 +534,16 @@ namespace {
 } // namespace
 
 $on_mod(Loaded) {
+    g_modEnabled.store(Mod::get()->getSettingValue<bool>("enabled"), std::memory_order_relaxed);
+    listenForSettingChanges<bool>("enabled", [](bool value) {
+        g_modEnabled.store(value, std::memory_order_relaxed);
+    });
+
+    g_funEnabled.store(Mod::get()->getSettingValue<bool>("enable-fun"), std::memory_order_relaxed);
+    listenForSettingChanges<bool>("enable-fun", [](bool value) {
+        g_funEnabled.store(value, std::memory_order_relaxed);
+    });
+
     updateRenderScale(Mod::get()->getSettingValue<double>("render-scale"));
     listenForSettingChanges<double>("render-scale", [](double value) {
         updateRenderScale(value);
@@ -637,7 +650,8 @@ class $modify(BetterVisualsGameLayer, GJBaseGameLayer) {
     }
 
     void visit() {
-        if (g_temporarilyDisabled.load(std::memory_order_relaxed) || g_isGameLayerVisitActive ||
+        if (g_temporarilyDisabled.load(std::memory_order_relaxed) ||
+            !g_modEnabled.load(std::memory_order_relaxed) || g_isGameLayerVisitActive ||
             static_cast<GJBaseGameLayer*>(this) != GJBaseGameLayer::get()) {
             GJBaseGameLayer::visit();
             return;

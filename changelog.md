@@ -1,21 +1,13 @@
 # Changelog
 
-## 1.6.2
+## 2.0.0
 
-- The mod now only works while in a level and the editor
-
-## 1.6.1
-
-- Fixed crash when changing fullscreen/windowed mode
-- Optimized bloom
-
-## 1.6.0
-
+- Added master settings and render scale
+- Added a button inside pause menus to open mod settings
 - Added AMD FidelityFX FSR 1 (EASU) as an upscale method
-
-## 1.5.0
-
-- Added render scale
+- Fixed crash when changing fullscreen/windowed mode
+- The mod now only works while in a level and the editor
+- Optimized bloom
 
 ## 1.4.0
 

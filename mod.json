@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "Better Visuals and FPS",
-	"version": "v1.6.2",
+	"version": "v2.0.0",
 	"developer": "imes",
 	"description": "Neat upscaling and post-processing mod.",
 	"tags": [
@@ -21,7 +21,29 @@
 		"community": "https://discord.gg/E8f6D6XqbW",
 		"source": "https://github.com/ItMe12s/BetterVisuals"
 	},
+	"resources": {
+		"sprites": [
+			"resources/*.png"
+		]
+	},
 	"settings": {
+		"master-title": {
+			"type": "title",
+			"name": "Master Settings"
+		},
+		"enabled": {
+			"type": "bool",
+			"name": "Enable Mod",
+			"description": "Master toggle for all effects.",
+			"default": true
+		},
+		"enable-fun": {
+			"type": "bool",
+			"name": "Enable Fun Shaders",
+			"description": "Master toggle for fun/gimmick effects.",
+			"default": true,
+			"enable-if": "enabled"
+		},
 		"rendering-title": {
 			"type": "title",
 			"name": "Rendering"
