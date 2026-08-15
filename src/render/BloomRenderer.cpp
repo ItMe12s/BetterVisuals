@@ -2,6 +2,7 @@
 
 #include "../shaders/fun/BloomShader.hpp"
 #include "FullscreenQuad.hpp"
+#include "Gl.hpp"
 #include "ShaderProgram.hpp"
 
 #include <Geode/Geode.hpp>
@@ -16,21 +17,6 @@ namespace {
 
     constexpr GLfloat kBlurKernelRadius = 3.f;
     constexpr GLfloat kBlurWideStep = 1.41421356f;
-
-    void configureTexture(GLuint texture) {
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
-    bool allocateTexture(GLuint texture, GLsizei width, GLsizei height) {
-        glBindTexture(GL_TEXTURE_2D, texture);
-        while (glGetError() != GL_NO_ERROR) {}
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        return glGetError() == GL_NO_ERROR;
-    }
 
 } // namespace
 
@@ -114,7 +100,7 @@ namespace bv::render {
             return false;
         }
         for (auto texture : textures) {
-            configureTexture(texture);
+            gl::configureTexture(texture);
         }
         return true;
     }
@@ -126,8 +112,8 @@ namespace bv::render {
 
         auto const halfWidth = (width + 1) / 2;
         auto const halfHeight = (height + 1) / 2;
-        if (!allocateTexture(m_bloomTexture, halfWidth, halfHeight) ||
-            !allocateTexture(m_horizontalTexture, halfWidth, halfHeight)) {
+        if (!gl::allocateTexture(m_bloomTexture, halfWidth, halfHeight) ||
+            !gl::allocateTexture(m_horizontalTexture, halfWidth, halfHeight)) {
             log::error("Unable to allocate {}x{} bloom textures", width, height);
             destroyResources();
             return false;

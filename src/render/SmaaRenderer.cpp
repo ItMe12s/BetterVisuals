@@ -2,6 +2,7 @@
 
 #include "../shaders/aa/SmaaLookupTextures.hpp"
 #include "FullscreenQuad.hpp"
+#include "Gl.hpp"
 #include "ShaderProgram.hpp"
 
 #include <Geode/Geode.hpp>
@@ -10,32 +11,6 @@
 #include <cstddef>
 
 using namespace geode::prelude;
-
-namespace {
-
-    void configureTexture(GLuint texture) {
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
-    void clearGlErrors() {
-        while (glGetError() != GL_NO_ERROR) {}
-    }
-
-    bool uploadTexture(
-        GLint internalFormat, GLsizei width, GLsizei height, GLenum format, void const* data
-    ) {
-        clearGlErrors();
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data
-        );
-        return glGetError() == GL_NO_ERROR;
-    }
-
-} // namespace
 
 namespace bv::render {
 
@@ -123,11 +98,11 @@ namespace bv::render {
             return false;
         }
         for (auto texture : textures) {
-            configureTexture(texture);
+            gl::configureTexture(texture);
         }
 
         glBindTexture(GL_TEXTURE_2D, m_areaTexture);
-        if (!uploadTexture(
+        if (!gl::uploadTexture(
                 GL_LUMINANCE_ALPHA,
                 static_cast<GLsizei>(shaders::smaa::kAreaTextureWidth),
                 static_cast<GLsizei>(shaders::smaa::kAreaTextureHeight),
@@ -140,7 +115,7 @@ namespace bv::render {
         }
 
         glBindTexture(GL_TEXTURE_2D, m_searchTexture);
-        if (!uploadTexture(
+        if (!gl::uploadTexture(
                 GL_LUMINANCE,
                 static_cast<GLsizei>(shaders::smaa::kSearchTextureWidth),
                 static_cast<GLsizei>(shaders::smaa::kSearchTextureHeight),
@@ -162,7 +137,7 @@ namespace bv::render {
 
         for (auto texture : {m_edgeTexture, m_weightTexture}) {
             glBindTexture(GL_TEXTURE_2D, texture);
-            if (!uploadTexture(GL_RGBA, width, height, GL_RGBA, nullptr)) {
+            if (!gl::uploadTexture(GL_RGBA, width, height, GL_RGBA, nullptr)) {
                 log::error("Unable to allocate a {}x{} SMAA framebuffer texture", width, height);
                 destroyResources();
                 return false;

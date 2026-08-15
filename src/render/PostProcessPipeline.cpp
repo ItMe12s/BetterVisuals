@@ -1,32 +1,11 @@
 #include "PostProcessPipeline.hpp"
 
+#include "Gl.hpp"
+
 #include <Geode/Geode.hpp>
 #include <cassert>
 
 using namespace geode::prelude;
-
-namespace {
-
-    void clearGlErrors() {
-        while (glGetError() != GL_NO_ERROR) {}
-    }
-
-    void configureTexture(GLuint texture) {
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
-    bool allocateTexture(GLuint texture, GLsizei width, GLsizei height) {
-        glBindTexture(GL_TEXTURE_2D, texture);
-        clearGlErrors();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        return glGetError() == GL_NO_ERROR;
-    }
-
-} // namespace
 
 namespace bv::render {
 
@@ -55,7 +34,7 @@ namespace bv::render {
         }
 
         for (auto texture : m_textures) {
-            configureTexture(texture);
+            gl::configureTexture(texture);
         }
         return true;
     }
@@ -65,8 +44,8 @@ namespace bv::render {
             return true;
         }
 
-        if (!allocateTexture(m_textures[0], width, height) ||
-            !allocateTexture(m_textures[1], width, height)) {
+        if (!gl::allocateTexture(m_textures[0], width, height) ||
+            !gl::allocateTexture(m_textures[1], width, height)) {
             log::error("Unable to allocate {}x{} post-process textures", width, height);
             destroyResources();
             return false;

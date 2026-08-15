@@ -163,11 +163,6 @@ namespace {
         g_antiAliasingMethod.store(AntiAliasingMethod::Off, std::memory_order_relaxed);
     }
 
-    void updateRenderScale(double value) {
-        auto const scale = std::isfinite(value) ? std::clamp(value, 0.25, 1.0) : 1.0;
-        g_renderScale.store(static_cast<float>(scale), std::memory_order_relaxed);
-    }
-
     void updateUpscaleMethod(std::string_view value) {
         if (value == "FSR 1") {
             g_upscaleMethod.store(UpscaleMethod::Fsr, std::memory_order_relaxed);
@@ -178,6 +173,30 @@ namespace {
             log::warn("Unknown upscale method '{}', using nearest neighbour", value);
         }
         g_upscaleMethod.store(UpscaleMethod::Nearest, std::memory_order_relaxed);
+    }
+
+    void bindBoolSetting(char const* name, std::atomic<bool>& value) {
+        value.store(Mod::get()->getSettingValue<bool>(name), std::memory_order_relaxed);
+        listenForSettingChanges<bool>(name, [&value](bool updated) {
+            value.store(updated, std::memory_order_relaxed);
+        });
+    }
+
+    void bindDoubleSetting(char const* name, std::atomic<float>& value) {
+        auto update = [&value](double input) {
+            value.store(static_cast<float>(input), std::memory_order_relaxed);
+        };
+        update(Mod::get()->getSettingValue<double>(name));
+        listenForSettingChanges<double>(name, [update](double input) {
+            update(input);
+        });
+    }
+
+    void bindStringSetting(char const* name, void (*update)(std::string_view)) {
+        update(Mod::get()->getSettingValue<std::string>(name));
+        listenForSettingChanges<std::string>(name, [update](std::string value) {
+            update(value);
+        });
     }
 
     GLsizei scaledDimension(GLsizei output, float scale) {
@@ -211,26 +230,6 @@ namespace {
             std::max<GLint>(0, right - left),
             std::max<GLint>(0, top - bottom),
         };
-    }
-
-    void updateCasSharpness(double value) {
-        auto const sharpness = std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
-        g_casSharpness.store(static_cast<float>(sharpness), std::memory_order_relaxed);
-    }
-
-    void updateBloomThreshold(double value) {
-        auto const threshold = std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.7;
-        g_bloomThreshold.store(static_cast<float>(threshold), std::memory_order_relaxed);
-    }
-
-    void updateBloomIntensity(double value) {
-        auto const intensity = std::isfinite(value) ? std::clamp(value, 0.0, 1.5) : 0.3;
-        g_bloomIntensity.store(static_cast<float>(intensity), std::memory_order_relaxed);
-    }
-
-    void updateBloomRadius(double value) {
-        auto const radius = std::isfinite(value) ? std::clamp(value, 0.0, 32.0) : 8.0;
-        g_bloomRadius.store(static_cast<float>(radius), std::memory_order_relaxed);
     }
 
     PostProcessConfig selectedPostProcessConfig() {
@@ -301,38 +300,27 @@ namespace {
         else if (!config.bloom) {
             g_bloomRenderer.reset();
         }
-        if (prepared && config.grayscale) {
-            prepared =
-                g_grayscaleRenderer.prepare(bv::shaders::kGrayscaleShader, key.width, key.height);
-        }
-        else if (!config.grayscale) {
-            g_grayscaleRenderer.reset();
-        }
-        if (prepared && config.pixelate) {
-            prepared =
-                g_pixelateRenderer.prepare(bv::shaders::kPixelateShader, key.width, key.height);
-        }
-        else if (!config.pixelate) {
-            g_pixelateRenderer.reset();
-        }
-        if (prepared && config.dithering) {
-            prepared =
-                g_ditheringRenderer.prepare(bv::shaders::kDitheringShader, key.width, key.height);
-        }
-        else if (!config.dithering) {
-            g_ditheringRenderer.reset();
-        }
-        if (prepared && config.vhs) {
-            prepared = g_vhsRenderer.prepare(bv::shaders::kVhsShader, key.width, key.height);
-        }
-        else if (!config.vhs) {
-            g_vhsRenderer.reset();
-        }
-        if (prepared && config.crt) {
-            prepared = g_crtRenderer.prepare(bv::shaders::kCrtShader, key.width, key.height);
-        }
-        else if (!config.crt) {
-            g_crtRenderer.reset();
+
+        struct Effect {
+            bool enabled;
+            bv::render::PostProcessRenderer* renderer;
+            bv::render::PostProcessShader const* shader;
+        };
+
+        std::array<Effect, 5> const effects{{
+            {config.grayscale, &g_grayscaleRenderer, &bv::shaders::kGrayscaleShader},
+            {config.pixelate, &g_pixelateRenderer, &bv::shaders::kPixelateShader},
+            {config.dithering, &g_ditheringRenderer, &bv::shaders::kDitheringShader},
+            {config.vhs, &g_vhsRenderer, &bv::shaders::kVhsShader},
+            {config.crt, &g_crtRenderer, &bv::shaders::kCrtShader},
+        }};
+        for (auto const& effect : effects) {
+            if (prepared && effect.enabled) {
+                prepared = effect.renderer->prepare(*effect.shader, key.width, key.height);
+            }
+            else if (!effect.enabled) {
+                effect.renderer->reset();
+            }
         }
 
         if (prepared && key.needsPresentation) {
@@ -534,91 +522,22 @@ namespace {
 } // namespace
 
 $on_mod(Loaded) {
-    g_modEnabled.store(Mod::get()->getSettingValue<bool>("enabled"), std::memory_order_relaxed);
-    listenForSettingChanges<bool>("enabled", [](bool value) {
-        g_modEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    g_funEnabled.store(Mod::get()->getSettingValue<bool>("enable-fun"), std::memory_order_relaxed);
-    listenForSettingChanges<bool>("enable-fun", [](bool value) {
-        g_funEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    updateRenderScale(Mod::get()->getSettingValue<double>("render-scale"));
-    listenForSettingChanges<double>("render-scale", [](double value) {
-        updateRenderScale(value);
-    });
-
-    updateUpscaleMethod(Mod::get()->getSettingValue<std::string>("upscale-method"));
-    listenForSettingChanges<std::string>("upscale-method", [](std::string value) {
-        updateUpscaleMethod(value);
-    });
-
-    updateAntiAliasingMethod(Mod::get()->getSettingValue<std::string>("aa-method"));
-    listenForSettingChanges<std::string>("aa-method", [](std::string value) {
-        updateAntiAliasingMethod(value);
-    });
-
-    g_casEnabled.store(Mod::get()->getSettingValue<bool>("cas-enabled"), std::memory_order_relaxed);
-    listenForSettingChanges<bool>("cas-enabled", [](bool value) {
-        g_casEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    updateCasSharpness(Mod::get()->getSettingValue<double>("cas-sharpness"));
-    listenForSettingChanges<double>("cas-sharpness", [](double value) {
-        updateCasSharpness(value);
-    });
-
-    g_bloomEnabled.store(Mod::get()->getSettingValue<bool>("bloom-enabled"), std::memory_order_relaxed);
-    listenForSettingChanges<bool>("bloom-enabled", [](bool value) {
-        g_bloomEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    updateBloomThreshold(Mod::get()->getSettingValue<double>("bloom-threshold"));
-    listenForSettingChanges<double>("bloom-threshold", [](double value) {
-        updateBloomThreshold(value);
-    });
-
-    updateBloomIntensity(Mod::get()->getSettingValue<double>("bloom-intensity"));
-    listenForSettingChanges<double>("bloom-intensity", [](double value) {
-        updateBloomIntensity(value);
-    });
-
-    updateBloomRadius(Mod::get()->getSettingValue<double>("bloom-radius"));
-    listenForSettingChanges<double>("bloom-radius", [](double value) {
-        updateBloomRadius(value);
-    });
-
-    g_grayscaleEnabled.store(
-        Mod::get()->getSettingValue<bool>("grayscale-enabled"), std::memory_order_relaxed
-    );
-    listenForSettingChanges<bool>("grayscale-enabled", [](bool value) {
-        g_grayscaleEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    g_pixelateEnabled.store(
-        Mod::get()->getSettingValue<bool>("pixelate-enabled"), std::memory_order_relaxed
-    );
-    listenForSettingChanges<bool>("pixelate-enabled", [](bool value) {
-        g_pixelateEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    g_ditheringEnabled.store(
-        Mod::get()->getSettingValue<bool>("dithering-enabled"), std::memory_order_relaxed
-    );
-    listenForSettingChanges<bool>("dithering-enabled", [](bool value) {
-        g_ditheringEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    g_vhsEnabled.store(Mod::get()->getSettingValue<bool>("vhs-enabled"), std::memory_order_relaxed);
-    listenForSettingChanges<bool>("vhs-enabled", [](bool value) {
-        g_vhsEnabled.store(value, std::memory_order_relaxed);
-    });
-
-    g_crtEnabled.store(Mod::get()->getSettingValue<bool>("crt-enabled"), std::memory_order_relaxed);
-    listenForSettingChanges<bool>("crt-enabled", [](bool value) {
-        g_crtEnabled.store(value, std::memory_order_relaxed);
-    });
+    bindBoolSetting("enabled", g_modEnabled);
+    bindBoolSetting("enable-fun", g_funEnabled);
+    bindDoubleSetting("render-scale", g_renderScale);
+    bindStringSetting("upscale-method", updateUpscaleMethod);
+    bindStringSetting("aa-method", updateAntiAliasingMethod);
+    bindBoolSetting("cas-enabled", g_casEnabled);
+    bindDoubleSetting("cas-sharpness", g_casSharpness);
+    bindBoolSetting("bloom-enabled", g_bloomEnabled);
+    bindDoubleSetting("bloom-threshold", g_bloomThreshold);
+    bindDoubleSetting("bloom-intensity", g_bloomIntensity);
+    bindDoubleSetting("bloom-radius", g_bloomRadius);
+    bindBoolSetting("grayscale-enabled", g_grayscaleEnabled);
+    bindBoolSetting("pixelate-enabled", g_pixelateEnabled);
+    bindBoolSetting("dithering-enabled", g_ditheringEnabled);
+    bindBoolSetting("vhs-enabled", g_vhsEnabled);
+    bindBoolSetting("crt-enabled", g_crtEnabled);
 }
 
 class $modify(BetterVisualsDirectorHook, CCDirector) {
