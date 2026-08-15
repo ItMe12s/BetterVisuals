@@ -1,4 +1,4 @@
-# BetterVisuals
+# Better Visuals and FPS
 
 More FPS or better visuals, up to you!
 

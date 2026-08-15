@@ -7,10 +7,10 @@
 		"ios": "2.2081"
 	},
 	"id": "imes.bettervisuals",
-	"name": "BetterVisuals",
+	"name": "Better Visuals and FPS",
 	"version": "v1.6.1",
 	"developer": "imes",
-	"description": "Neat anti-aliasing and post-processing mod.",
+	"description": "Neat upscaling and post-processing mod.",
 	"tags": [
 		"universal",
 		"enhancement",

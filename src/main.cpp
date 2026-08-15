@@ -670,10 +670,10 @@ class $modify(BetterVisualsMenuLayer, MenuLayer) {
             !g_disablePopupShown.exchange(true)) {
             queueInMainThread([] {
                 createQuickPopup(
-                    "BetterVisuals",
-                    "BetterVisuals temporary disabled."
-                    " Please restart the game to keep fullscreen/windowed mode."
-                    " Sorry for the inconvenience!",
+                    "Better Visuals and FPS",
+                    "Better Visuals and FPS temporary disabled.\n"
+                    " Please restart the game to keep fullscreen/windowed mode.\n"
+                    "Sorry for the inconvenience!",
                     "OK",
                     nullptr,
                     [](FLAlertLayer*, bool) {}
