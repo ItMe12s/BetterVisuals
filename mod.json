@@ -8,13 +8,13 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "BetterVisuals",
-	"version": "v1.6.0",
+	"version": "v1.6.1",
 	"developer": "imes",
 	"description": "Neat anti-aliasing and post-processing mod.",
 	"tags": [
 		"universal",
-		"offline",
 		"enhancement",
+		"performance",
 		"customization"
 	],
 	"links": {
