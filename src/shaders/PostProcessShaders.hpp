@@ -21,6 +21,8 @@ void main() {
     extern render::PostProcessShader const kCasShader;
     extern render::PostProcessShader const kGrayscaleShader;
     extern render::PostProcessShader const kPixelateShader;
+    extern render::PostProcessShader const kInvertShader;
+    extern render::PostProcessShader const kFlipShader;
     extern render::PostProcessShader const kDitheringShader;
     extern render::PostProcessShader const kVhsShader;
     extern render::PostProcessShader const kCrtShader;

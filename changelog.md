@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- Added invert and flip shaders
 - Made pause menu buttons toggleable
 
 ## 2.1.1

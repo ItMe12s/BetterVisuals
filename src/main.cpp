@@ -56,6 +56,8 @@ namespace {
         float bloomRadius = 8.f;
         bool grayscale = false;
         bool pixelate = false;
+        bool invert = false;
+        bool flip = false;
         bool dithering = false;
         bool vhs = false;
         bool crt = false;
@@ -64,8 +66,8 @@ namespace {
         bool operator==(PostProcessConfig const&) const = default;
 
         int effectCount() const {
-            return (aa != AntiAliasingMethod::Off) + cas + bloom + grayscale + pixelate +
-                dithering + vhs + crt;
+            return (aa != AntiAliasingMethod::Off) + cas + bloom + grayscale + pixelate + invert +
+                flip + dithering + vhs + crt;
         }
     };
 
@@ -98,6 +100,8 @@ namespace {
     std::atomic<float> g_bloomRadius = 8.f;
     std::atomic<bool> g_grayscaleEnabled = false;
     std::atomic<bool> g_pixelateEnabled = false;
+    std::atomic<bool> g_invertEnabled = false;
+    std::atomic<bool> g_flipEnabled = false;
     std::atomic<bool> g_ditheringEnabled = false;
     std::atomic<bool> g_vhsEnabled = false;
     std::atomic<bool> g_crtEnabled = false;
@@ -116,6 +120,8 @@ namespace {
     bv::render::BloomRenderer g_bloomRenderer;
     bv::render::PostProcessRenderer g_grayscaleRenderer;
     bv::render::PostProcessRenderer g_pixelateRenderer;
+    bv::render::PostProcessRenderer g_invertRenderer;
+    bv::render::PostProcessRenderer g_flipRenderer;
     bv::render::PostProcessRenderer g_ditheringRenderer;
     bv::render::PostProcessRenderer g_vhsRenderer;
     bv::render::PostProcessRenderer g_crtRenderer;
@@ -142,6 +148,8 @@ namespace {
         g_bloomRenderer.reset();
         g_grayscaleRenderer.reset();
         g_pixelateRenderer.reset();
+        g_invertRenderer.reset();
+        g_flipRenderer.reset();
         g_ditheringRenderer.reset();
         g_vhsRenderer.reset();
         g_crtRenderer.reset();
@@ -254,6 +262,8 @@ namespace {
             g_bloomRadius.load(std::memory_order_relaxed),
             fun && g_grayscaleEnabled.load(std::memory_order_relaxed),
             fun && g_pixelateEnabled.load(std::memory_order_relaxed),
+            fun && g_invertEnabled.load(std::memory_order_relaxed),
+            fun && g_flipEnabled.load(std::memory_order_relaxed),
             fun && g_ditheringEnabled.load(std::memory_order_relaxed),
             fun && g_vhsEnabled.load(std::memory_order_relaxed),
             fun && g_crtEnabled.load(std::memory_order_relaxed),
@@ -318,9 +328,11 @@ namespace {
             bv::render::PostProcessShader const* shader;
         };
 
-        std::array<Effect, 5> const effects{{
+        std::array<Effect, 7> const effects{{
             {config.grayscale, &g_grayscaleRenderer, &bv::shaders::kGrayscaleShader},
             {config.pixelate, &g_pixelateRenderer, &bv::shaders::kPixelateShader},
+            {config.invert, &g_invertRenderer, &bv::shaders::kInvertShader},
+            {config.flip, &g_flipRenderer, &bv::shaders::kFlipShader},
             {config.dithering, &g_ditheringRenderer, &bv::shaders::kDitheringShader},
             {config.vhs, &g_vhsRenderer, &bv::shaders::kVhsShader},
             {config.crt, &g_crtRenderer, &bv::shaders::kCrtShader},
@@ -404,6 +416,12 @@ namespace {
         }
         if (config.pixelate) {
             runPost(g_pixelateRenderer);
+        }
+        if (config.invert) {
+            runPost(g_invertRenderer);
+        }
+        if (config.flip) {
+            runPost(g_flipRenderer);
         }
         if (config.dithering) {
             runPost(g_ditheringRenderer);
@@ -567,6 +585,8 @@ $on_mod(Loaded) {
     bindDoubleSetting("bloom-radius", g_bloomRadius);
     bindBoolSetting("grayscale-enabled", g_grayscaleEnabled);
     bindBoolSetting("pixelate-enabled", g_pixelateEnabled);
+    bindBoolSetting("invert-enabled", g_invertEnabled);
+    bindBoolSetting("flip-enabled", g_flipEnabled);
     bindBoolSetting("dithering-enabled", g_ditheringEnabled);
     bindBoolSetting("vhs-enabled", g_vhsEnabled);
     bindBoolSetting("crt-enabled", g_crtEnabled);

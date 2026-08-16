@@ -222,6 +222,18 @@
 			"description": "Apply a pixelated effect.",
 			"default": false
 		},
+		"invert-enabled": {
+			"type": "bool",
+			"name": "Invert",
+			"description": "Invert the colors.",
+			"default": false
+		},
+		"flip-enabled": {
+			"type": "bool",
+			"name": "Flip",
+			"description": "Flip the image upside down.",
+			"default": false
+		},
 		"dithering-enabled": {
 			"type": "bool",
 			"name": "Dithering Filter",
