@@ -7,8 +7,10 @@
 #include "shaders/aa/SmaaShader.hpp"
 
 #include <Geode/Geode.hpp>
+#include <Geode/loader/Hook.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCDirector.hpp>
+#include <Geode/modify/CCNode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/platform/cplatform.h>
@@ -101,6 +103,9 @@ namespace {
     std::atomic<bool> g_crtEnabled = false;
     std::atomic<bool> g_modEnabled = true;
     std::atomic<bool> g_funEnabled = true;
+    std::atomic<bool> g_fullSceneEnabled = false;
+    geode::Hook* g_sceneVisitHook = nullptr;
+    geode::Hook* g_gameLayerVisitHook = nullptr;
     std::atomic<bool> g_temporarilyDisabled = false;
     std::atomic<bool> g_disablePopupShown = false;
     bv::render::PostProcessPipeline g_postProcessPipeline;
@@ -117,7 +122,7 @@ namespace {
     bv::render::SmaaRenderer g_smaaRenderer;
     std::optional<PostProcessKey> g_preparedPostProcessKey;
     std::optional<PostProcessFailureKey> g_failedPostProcessKey;
-    bool g_isGameLayerVisitActive = false;
+    bool g_isSceneVisitActive = false;
     bool g_isSceneCaptureActive = false;
     GLsizei g_captureWidth = 0;
     GLsizei g_captureHeight = 0;
@@ -538,6 +543,18 @@ namespace {
 $on_mod(Loaded) {
     bindBoolSetting("enabled", g_modEnabled);
     bindBoolSetting("enable-fun", g_funEnabled);
+
+    auto applyFullScene = [](bool on) {
+        g_fullSceneEnabled.store(on, std::memory_order_relaxed);
+        if (g_sceneVisitHook) {
+            (void)g_sceneVisitHook->toggle(on);
+        }
+        if (g_gameLayerVisitHook) {
+            (void)g_gameLayerVisitHook->toggle(!on);
+        }
+    };
+    applyFullScene(Mod::get()->getSettingValue<bool>("full-scene-effects"));
+    listenForSettingChanges<bool>("full-scene-effects", applyFullScene);
     bindDoubleSetting("render-scale", g_renderScale);
     bindStringSetting("upscale-method", updateUpscaleMethod);
     bindStringSetting("aa-method", updateAntiAliasingMethod);
@@ -581,21 +598,52 @@ class $modify(BetterVisualsGameLayer, GJBaseGameLayer) {
         if (!self.setHookPriorityPre("GJBaseGameLayer::visit", Priority::VeryLate)) {
             log::warn("Unable to set GJBaseGameLayer::visit hook priority");
         }
+        if (auto hook = self.getHook("GJBaseGameLayer::visit")) {
+            g_gameLayerVisitHook = hook.unwrap();
+        }
     }
 
     void visit() {
         if (g_temporarilyDisabled.load(std::memory_order_relaxed) ||
-            !g_modEnabled.load(std::memory_order_relaxed) || g_isGameLayerVisitActive ||
+            !g_modEnabled.load(std::memory_order_relaxed) ||
+            g_fullSceneEnabled.load(std::memory_order_relaxed) || g_isSceneVisitActive ||
             static_cast<GJBaseGameLayer*>(this) != GJBaseGameLayer::get()) {
             GJBaseGameLayer::visit();
             return;
         }
 
-        g_isGameLayerVisitActive = true;
+        g_isSceneVisitActive = true;
         renderSceneWithPostProcessing([this] {
             GJBaseGameLayer::visit();
         });
-        g_isGameLayerVisitActive = false;
+        g_isSceneVisitActive = false;
+    }
+};
+
+class $modify(BetterVisualsSceneVisitHook, CCNode) {
+    static void onModify(auto& self) {
+        if (!self.setHookPriorityPre("cocos2d::CCNode::visit", Priority::VeryLate)) {
+            log::warn("Unable to set CCNode::visit hook priority");
+        }
+        if (auto hook = self.getHook("cocos2d::CCNode::visit")) {
+            g_sceneVisitHook = hook.unwrap();
+        }
+    }
+
+    void visit() {
+        if (!g_fullSceneEnabled.load(std::memory_order_relaxed) ||
+            g_temporarilyDisabled.load(std::memory_order_relaxed) ||
+            !g_modEnabled.load(std::memory_order_relaxed) || g_isSceneVisitActive ||
+            static_cast<CCNode*>(this) != CCDirector::get()->getRunningScene()) {
+            CCNode::visit();
+            return;
+        }
+
+        g_isSceneVisitActive = true;
+        renderSceneWithPostProcessing([this] {
+            CCNode::visit();
+        });
+        g_isSceneVisitActive = false;
     }
 };
 

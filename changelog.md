@@ -1,8 +1,9 @@
 # Changelog
 
-## 2.0.1
+## 2.1.0
 
 - Added Bilinear Interpolation as an upscale method
+- Added back full scene post-processing for non-iOS devices
 - Made FSR 1 sharpness customizable
 
 ## 2.0.0

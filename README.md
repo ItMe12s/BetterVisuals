@@ -2,7 +2,7 @@
 
 More FPS or better visuals, up to you!
 
-Mod only works in levels and the editor, change settings in the pause menu.
+Pro tip: You can change the settings in pause menus.
 
 **Also known as:** Less Jagged Edges, Super Secret Settings.
 

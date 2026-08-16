@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "Better Visuals and FPS",
-	"version": "v2.0.1",
+	"version": "v2.1.0",
 	"developer": "imes",
 	"description": "Neat upscaling and post-processing mod.",
 	"tags": [
@@ -43,6 +43,18 @@
 			"description": "Master toggle for fun/gimmick effects.",
 			"default": true,
 			"enable-if": "enabled"
+		},
+		"full-scene-effects": {
+			"type": "bool",
+			"name": "Full-Scene Effects",
+			"description": "Apply all enabled effects to everything, not just levels and the editor.",
+			"default": false,
+			"enable-if": "enabled",
+			"platforms": [
+				"win",
+				"mac",
+				"android"
+			]
 		},
 		"rendering-title": {
 			"type": "title",
