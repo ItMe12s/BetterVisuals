@@ -80,7 +80,10 @@ def accumulate_tap(
 
 
 def easu_upscale(
-    image: list[list[tuple[float, float, float]]], out_width: int, out_height: int
+    image: list[list[tuple[float, float, float]]],
+    out_width: int,
+    out_height: int,
+    sharpness: float = 1.0,
 ) -> list[list[tuple[float, float, float]]]:
     height, width = len(image), len(image[0])
     output: list[list[tuple[float, float, float]]] = []
@@ -171,12 +174,10 @@ def easu_upscale(
             clip = 1.0 / max(lob, EPSILON)
 
             min4 = tuple(
-                min(taps[name][channel] for name in ("f", "g", "j", "k"))
-                for channel in range(3)
+                min(taps[name][channel] for name in taps) for channel in range(3)
             )
             max4 = tuple(
-                max(taps[name][channel] for name in ("f", "g", "j", "k"))
-                for channel in range(3)
+                max(taps[name][channel] for name in taps) for channel in range(3)
             )
 
             accumulation = [0.0, 0.0, 0.0]
@@ -210,7 +211,17 @@ def easu_upscale(
                 max4[channel],
                 max(min4[channel], accumulation[channel] * (1.0 / weight_sum[0])),
             )
-            row.append((clamped(0), clamped(1), clamped(2)))
+            easu = (clamped(0), clamped(1), clamped(2))
+            blend = max(0.0, min(sharpness, 1.0))
+            blend = tuple(
+                easu[c] * blend
+                + taps["f"][c] * (1 - pp[0]) * (1 - pp[1]) * (1 - blend)
+                + taps["g"][c] * pp[0] * (1 - pp[1]) * (1 - blend)
+                + taps["j"][c] * (1 - pp[0]) * pp[1] * (1 - blend)
+                + taps["k"][c] * pp[0] * pp[1] * (1 - blend)
+                for c in range(3)
+            )
+            row.append(blend)
         output.append(row)
     return output
 
@@ -261,9 +272,9 @@ def main() -> None:
                 pp_y = (y + 0.5) / out_height * height - 0.5
                 fp = (floor(pp_x), floor(pp_y))
                 neighborhood = [
-                    sample_tap(noisy, fp, (dx, dy))
-                    for dx in (0.0, 1.0)
-                    for dy in (0.0, 1.0)
+                    sample_tap(noisy, fp, (fx, fy))
+                    for fx in (-1.0, 0.0, 1.0, 2.0)
+                    for fy in (-1.0, 0.0, 1.0, 2.0)
                 ]
                 for channel in range(3):
                     minimum = min(color[channel] for color in neighborhood)

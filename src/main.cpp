@@ -41,6 +41,7 @@ namespace {
 
     enum class UpscaleMethod {
         Nearest,
+        Bilinear,
         Fsr,
     };
 
@@ -88,6 +89,7 @@ namespace {
     std::atomic<float> g_renderScale = 1.f;
     std::atomic<bool> g_casEnabled = false;
     std::atomic<float> g_casSharpness = 0.f;
+    std::atomic<float> g_fsrSharpness = 0.5f;
     std::atomic<bool> g_bloomEnabled = false;
     std::atomic<float> g_bloomThreshold = 0.7f;
     std::atomic<float> g_bloomIntensity = 0.3f;
@@ -164,6 +166,10 @@ namespace {
     }
 
     void updateUpscaleMethod(std::string_view value) {
+        if (value == "Bilinear") {
+            g_upscaleMethod.store(UpscaleMethod::Bilinear, std::memory_order_relaxed);
+            return;
+        }
         if (value == "FSR 1") {
             g_upscaleMethod.store(UpscaleMethod::Fsr, std::memory_order_relaxed);
             return;
@@ -500,12 +506,20 @@ namespace {
                 auto const sourceTexture = g_postProcessPipeline.currentTexture();
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, sourceTexture);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(
+                    GL_TEXTURE_2D,
+                    GL_TEXTURE_MIN_FILTER,
+                    config.upscaling == UpscaleMethod::Bilinear ? GL_LINEAR : GL_NEAREST
+                );
+                glTexParameteri(
+                    GL_TEXTURE_2D,
+                    GL_TEXTURE_MAG_FILTER,
+                    config.upscaling == UpscaleMethod::Bilinear ? GL_LINEAR : GL_NEAREST
+                );
                 glBindFramebuffer(GL_FRAMEBUFFER, callerTarget.framebuffer);
                 glViewport(callerTarget.x, callerTarget.y, callerTarget.width, callerTarget.height);
                 if (config.upscaling == UpscaleMethod::Fsr) {
-                    g_fsrRenderer.apply(sourceTexture);
+                    g_fsrRenderer.apply(sourceTexture, g_fsrSharpness.load(std::memory_order_relaxed));
                 }
                 else {
                     g_renderScaleRenderer.apply(sourceTexture);
@@ -529,6 +543,7 @@ $on_mod(Loaded) {
     bindStringSetting("aa-method", updateAntiAliasingMethod);
     bindBoolSetting("cas-enabled", g_casEnabled);
     bindDoubleSetting("cas-sharpness", g_casSharpness);
+    bindDoubleSetting("fsr-sharpness", g_fsrSharpness);
     bindBoolSetting("bloom-enabled", g_bloomEnabled);
     bindDoubleSetting("bloom-threshold", g_bloomThreshold);
     bindDoubleSetting("bloom-intensity", g_bloomIntensity);

@@ -8,7 +8,7 @@ Mod only works in levels and the editor, change settings in the pause menu.
 
 Recommended settings:
 
-- `Max FPS`: 0.5x + Nearest, AA off, Sharpening off.
+- `Max FPS`: 0.5x + Bilinear, AA off, Sharpening off.
 - `Better FPS`: 0.7x + FSR 1, AA off, Sharpening off.
 - `Better Visuals`: 1x, SMAA High, Sharpening off.
 - `Stream/Record`: 1x, SMAA High, Sharpening on.
@@ -23,9 +23,10 @@ Render the game at lower resolution for faster rendering then upscale it.
 Available methods:
 
 - Nearest neighbour
+- Bilinear interpolation
 - AMD FidelityFX FSR 1 (EASU)
 
-Nearest neighbour is the fastest.
+Nearest and Bilinear are the same speed (fastest), but Bilinear will be more smooth.
 FSR 1 produces sharper edges while upscaling with a small performance cost.
 
 ## Anti-aliasing

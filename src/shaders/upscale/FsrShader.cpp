@@ -39,6 +39,7 @@ namespace bv::shaders::fsr {
 
 uniform sampler2D u_texture;
 uniform vec2 u_invResolution;
+uniform float u_sharpness;
 varying vec2 v_texCoord;
 
 #define FSR_EPSILON (1e-7)
@@ -176,8 +177,14 @@ void main() {
     float lob = 0.5 - 0.29 * len;
     float clip = 1.0 / max(lob, FSR_EPSILON);
 
-    vec3 min4 = min(min(f.rgb, g), min(j, k));
-    vec3 max4 = max(max(f.rgb, g), max(j, k));
+    vec3 min4 = min(
+        f.rgb,
+        min(b, min(c, min(i, min(j, min(e, min(g, min(h, min(k, min(l, min(n, o))))))))))
+    );
+    vec3 max4 = max(
+        f.rgb,
+        max(b, max(c, max(i, max(j, max(e, max(g, max(h, max(k, max(l, max(n, o))))))))))
+    );
 
     vec3 accumulation = vec3(0.0);
     float weight = 0.0;
@@ -194,7 +201,13 @@ void main() {
     accumulateTap(accumulation, weight, vec2(1.0, 2.0), dir, len2, lob, clip, o);
     accumulateTap(accumulation, weight, vec2(0.0, 2.0), dir, len2, lob, clip, n);
 
-    vec3 pixel = min(max4, max(min4, accumulation * (1.0 / weight)));
+    vec3 bilinear = mix(mix(f.rgb, g, pp.x), mix(j, k, pp.x), pp.y);
+
+    vec3 pixel = mix(
+        bilinear,
+        min(max4, max(min4, accumulation * (1.0 / weight))),
+        clamp(u_sharpness, 0.0, 1.0)
+    );
     gl_FragColor = vec4(pixel, f.a);
 }
 )glsl";
@@ -207,6 +220,7 @@ namespace bv::shaders {
         "AMD FidelityFX FSR 1 (EASU)",
         kFullscreenVertexSource,
         fsr::kFragmentSource,
+        "u_sharpness",
     };
 
 } // namespace bv::shaders

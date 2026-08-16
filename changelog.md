@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1
+
+- Added Bilinear Interpolation as an upscale method
+- Made FSR 1 sharpness customizable
+
 ## 2.0.0
 
 - Added master settings and render scale

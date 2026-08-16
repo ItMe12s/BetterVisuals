@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "Better Visuals and FPS",
-	"version": "v2.0.0",
+	"version": "v2.0.1",
 	"developer": "imes",
 	"description": "Neat upscaling and post-processing mod.",
 	"tags": [
@@ -69,8 +69,23 @@
 			"default": "FSR 1",
 			"one-of": [
 				"Nearest",
+				"Bilinear",
 				"FSR 1"
 			]
+		},
+		"fsr-sharpness": {
+			"type": "float",
+			"name": "FSR Sharpness",
+			"description": "FSR 1 reconstruction strength. Lower is smoother, 1 is sharpest.",
+			"default": 0.5,
+			"min": 0.0,
+			"max": 1.0,
+			"control": {
+				"arrows": true,
+				"arrow-step": 0.1,
+				"slider": true,
+				"slider-step": 0.05
+			}
 		},
 		"aa-title": {
 			"type": "title",
