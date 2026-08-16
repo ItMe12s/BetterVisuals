@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0
+
+- Made pause menu buttons toggleable
+
 ## 2.1.1
 
 - New default settings

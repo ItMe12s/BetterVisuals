@@ -28,14 +28,18 @@ void makeSettingsButton(CCLayer* parent, char const* menuId) {
 class $modify(PauseLayer) {
     void customSetup() {
         PauseLayer::customSetup();
-        makeSettingsButton(this, "left-button-menu");
+        if (Mod::get()->getSettingValue<bool>("pause-menu-button")) {
+            makeSettingsButton(this, "left-button-menu");
+        }
     }
 };
 
 class $modify(EditorPauseLayer) {
     bool init(LevelEditorLayer* po) {
         if (!EditorPauseLayer::init(po)) return false;
-        makeSettingsButton(this, "guidelines-menu");
+        if (Mod::get()->getSettingValue<bool>("editor-pause-button")) {
+            makeSettingsButton(this, "guidelines-menu");
+        }
         return true;
     }
 };

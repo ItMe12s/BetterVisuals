@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "Better Visuals and FPS",
-	"version": "v2.1.1",
+	"version": "v2.2.0",
 	"developer": "imes",
 	"description": "Neat upscaling and post-processing mod.",
 	"tags": [
@@ -55,6 +55,22 @@
 				"mac",
 				"android"
 			]
+		},
+		"menu-title": {
+			"type": "title",
+			"name": "Pause Menu Buttons"
+		},
+		"pause-menu-button": {
+			"type": "bool",
+			"name": "Show in Level Pause Menu",
+			"description": "Show the mod settings button in the level pause menu.",
+			"default": true
+		},
+		"editor-pause-button": {
+			"type": "bool",
+			"name": "Show in Editor Pause Menu",
+			"description": "Show the mod settings button in the editor pause menu.",
+			"default": true
 		},
 		"rendering-title": {
 			"type": "title",
