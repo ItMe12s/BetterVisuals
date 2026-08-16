@@ -1,35 +1,39 @@
-# Better Visuals and FPS
+# <c-ffba30>Better</c> <c-ffce2b>Visuals</c> <c-ffe600>and</c> <c-fff424>FPS</c>
 
 More FPS or better visuals, up to you!
 
 Pro tip: You can change the settings in pause menus.
 
-**Also known as:** Less Jagged Edges, Super Secret Settings.
-
 Recommended settings:
 
-- `Max FPS`: 0.5x + Bilinear, AA off, Sharpening off.
-- `Better FPS`: 0.7x + FSR 1, AA off, Sharpening off.
-- `Better Visuals`: 1x, SMAA High, Sharpening off.
+- `Max FPS`: 0.5x + Bilinear, AA off, Sharpening off. (Try this)
+- `Better FPS`: 0.7x + Bilinear, AA off, Sharpening off. (or FSR 1)
+- `Better Visuals`: 1x, SMAA High, Sharpening off. (Default)
 - `Stream/Record`: 1x, SMAA High, Sharpening on.
 - `YT Showcase`: 1x, SMAA Ultra, Sharpening on.
 
 *May distort text and UI elements.*
 
-## Render Scale
+---
+
+## <c-47f0ff>Render Scale</c>
 
 Render the game at lower resolution for faster rendering then upscale it.
 
 Available methods:
 
-- Nearest neighbour
-- Bilinear interpolation
+- Nearest neighbour (Native)
+- Bilinear interpolation (Native, Default)
 - AMD FidelityFX FSR 1 (EASU)
 
-Nearest and Bilinear are the same speed (fastest), but Bilinear will be more smooth.
+Nearest and Bilinear are the same speed (fastest), but Bilinear looks smoother.
 FSR 1 produces sharper edges while upscaling with a small performance cost.
 
-## Anti-aliasing
+*FSR 1 can have more downsides on older hardware.*
+
+---
+
+## <c-c247ff>Anti-aliasing</c>
 
 Makes the game look better while playing levels.
 
@@ -39,15 +43,20 @@ Available methods:
 - SMAA High (default)
 - SMAA Ultra
 
-FXAA is the fastest. SMAA High offers better image quality with a small (unnoticeable) performance cost.
-SMAA Ultra is overkill unless you play or record at very low or very high resolutions (such as 720p or 4K) on a large screen.
+FXAA is the fastest.
+SMAA High adds better quality with minimal performance cost,
+while SMAA Ultra is overkill except for extreme resolutions like 720p or 4K on large screens.
 
-## AMD FidelityFX CAS
+---
 
-A fast, high-quality sharpening method that improves image clarity.
-It may also improve the appearance of streams and showcase videos at low to medium bitrates.
+## <c-ff0000>AMD FidelityFX CAS</c>
 
-## Fun stuff
+A fast, high-quality sharpening filter that improves image clarity.
+Also makes streams or videos look sharper at low to medium bitrates.
+
+---
+
+## <c-ff8ab1>Fun stuff</c>
 
 Extra shaders you can mix and customize:
 
@@ -60,7 +69,9 @@ Extra shaders you can mix and customize:
 
 *These may cause lag on mobile or low-end devices.*
 
-## Want more AA methods and shaders?
+---
+
+## <c-4dafff>Want more AA methods and shaders?</c>
 
 Join the Discord server or open a GitHub issue/feature request!
 
@@ -68,10 +79,11 @@ Framebuffer and VBO handling referenced from [DevTools](https://github.com/geode
 
 Other credits, citations, and licenses can be found in the mod's source code
 
-## Quotes I got while making the mod
+---
 
-"Finally I can play at 1000 FPS (I use a 200Hz screen)"
+## <c-00ffa6>Quotes I got while making the mod</c>
 
-"works perfectly thanks !! /Unlisted YouTube GD showcase/"
-
-"No phone overheat after the upscale update"
+- Finally I can play at 1000 FPS (I use a 200Hz screen)
+- works perfectly thanks !! /Unlisted YouTube GD showcase/
+- No phone overheat after the upscale update
+- no wait i made it work LMAO from 400fps to 900fps :fire:

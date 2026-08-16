@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.1
+
+- New default settings
+- Mod about page improvements
+
 ## 2.1.0
 
 - Added Bilinear Interpolation as an upscale method

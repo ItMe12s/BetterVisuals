@@ -8,7 +8,7 @@
 	},
 	"id": "imes.bettervisuals",
 	"name": "Better Visuals and FPS",
-	"version": "v2.1.0",
+	"version": "v2.1.1",
 	"developer": "imes",
 	"description": "Neat upscaling and post-processing mod.",
 	"tags": [
@@ -78,7 +78,7 @@
 			"type": "string",
 			"name": "Upscale Method",
 			"description": "How the game is scaled back up. Turn off automatically at 1x scale.",
-			"default": "FSR 1",
+			"default": "Bilinear",
 			"one-of": [
 				"Nearest",
 				"Bilinear",
