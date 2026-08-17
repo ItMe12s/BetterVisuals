@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1
+
+- Added mobile device support for fullscreen effects
+
 ## 2.2.0
 
 - Added invert and flip shaders

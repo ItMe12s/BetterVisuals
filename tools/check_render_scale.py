@@ -22,6 +22,21 @@ def source_index(output_index: int, output_size: int, internal_size: int) -> int
     return min(max(index, 0), internal_size - 1)
 
 
+def scaled_scissor(
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    full_w: int,
+    full_h: int,
+    internal_w: int,
+    internal_h: int,
+) -> tuple[int, int, int, int]:
+    scale_x = internal_w / full_w
+    scale_y = internal_h / full_h
+    return (int(x * scale_x), int(y * scale_y), int(w * scale_x), int(h * scale_y))
+
+
 def main() -> None:
     assert normalize_scale(float("nan")) == 1.0
     assert normalize_scale(float("inf")) == 1.0
@@ -37,6 +52,26 @@ def main() -> None:
     assert [source_index(index, 4, 2) for index in range(4)] == [0, 0, 1, 1]
     assert source_index(0, 1920, 960) == 0
     assert source_index(1919, 1920, 960) == 959
+
+    assert scaled_scissor(0, 0, 1920, 1080, 1920, 1080, 960, 540) == (0, 0, 960, 540)
+    assert scaled_scissor(100, 200, 300, 400, 1920, 1080, 960, 540) == (
+        50,
+        100,
+        150,
+        200,
+    )
+    assert scaled_scissor(0, 0, 1920, 1080, 1920, 1080, 1920, 1080) == (
+        0,
+        0,
+        1920,
+        1080,
+    )
+    assert scaled_scissor(1920, 1080, 1920, 1080, 1920, 1080, 960, 540) == (
+        960,
+        540,
+        960,
+        540,
+    )
 
     print("Render scale self-check passed.")
 

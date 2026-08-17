@@ -10,6 +10,7 @@
 #include <Geode/loader/Hook.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/CCDirector.hpp>
+#include <Geode/modify/CCEGLViewProtocol.hpp>
 #include <Geode/modify/CCNode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/MenuLayer.hpp>
@@ -132,10 +133,23 @@ namespace {
     bool g_isSceneCaptureActive = false;
     GLsizei g_captureWidth = 0;
     GLsizei g_captureHeight = 0;
+    GLsizei g_captureFullWidth = 0;
+    GLsizei g_captureFullHeight = 0;
 
     void applyCaptureViewport() {
         if (g_isSceneCaptureActive) {
             glViewport(0, 0, g_captureWidth, g_captureHeight);
+        }
+    }
+
+    void scaleCaptureScissor(float& x, float& y, float& w, float& h) {
+        if (g_isSceneCaptureActive && g_captureFullWidth > 0 && g_captureWidth != g_captureFullWidth) {
+            auto const scaleX = static_cast<float>(g_captureWidth) / g_captureFullWidth;
+            auto const scaleY = static_cast<float>(g_captureHeight) / g_captureFullHeight;
+            x *= scaleX;
+            y *= scaleY;
+            w *= scaleX;
+            h *= scaleY;
         }
     }
 
@@ -222,33 +236,6 @@ namespace {
         return static_cast<GLsizei>(
             std::max<long>(1, std::lround(static_cast<double>(output) * scale))
         );
-    }
-
-    std::array<GLint, 4> scaledScissorBox(
-        std::array<GLint, 4> const& box, std::array<GLint, 4> const& viewport, GLsizei width,
-        GLsizei height
-    ) {
-        auto mapStart = [](GLint value, GLint origin, GLsizei internalSize, GLsizei outputSize) {
-            return static_cast<GLint>(
-                std::floor(static_cast<double>(value - origin) * internalSize / outputSize)
-            );
-        };
-        auto mapEnd = [](GLint value, GLint origin, GLsizei internalSize, GLsizei outputSize) {
-            return static_cast<GLint>(
-                std::ceil(static_cast<double>(value - origin) * internalSize / outputSize)
-            );
-        };
-
-        auto const left = mapStart(box[0], viewport[0], width, viewport[2]);
-        auto const bottom = mapStart(box[1], viewport[1], height, viewport[3]);
-        auto const right = mapEnd(box[0] + box[2], viewport[0], width, viewport[2]);
-        auto const top = mapEnd(box[1] + box[3], viewport[1], height, viewport[3]);
-        return {
-            left,
-            bottom,
-            std::max<GLint>(0, right - left),
-            std::max<GLint>(0, top - bottom),
-        };
     }
 
     PostProcessConfig selectedPostProcessConfig() {
@@ -463,10 +450,6 @@ namespace {
             return;
         }
 
-        auto const scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
-        std::array<GLint, 4> callerScissor = {};
-        glGetIntegerv(GL_SCISSOR_BOX, callerScissor.data());
-
         PostProcessKey const key{config, internalWidth, internalHeight, needsPresentation};
         PostProcessFailureKey const failureKey{
             key,
@@ -495,14 +478,11 @@ namespace {
         };
 
         g_postProcessPipeline.beginSceneCapture();
-        if (scissorEnabled == GL_TRUE) {
-            auto const scissor =
-                scaledScissorBox(callerScissor, callerViewport, internalWidth, internalHeight);
-            glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
-        }
         g_isSceneCaptureActive = true;
         g_captureWidth = internalWidth;
         g_captureHeight = internalHeight;
+        g_captureFullWidth = width;
+        g_captureFullHeight = height;
         visitNext();
         g_isSceneCaptureActive = false;
 
@@ -603,6 +583,15 @@ class $modify(BetterVisualsDirectorHook, CCDirector) {
         applyCaptureViewport();
     }
 };
+
+#ifdef GEODE_IS_MOBILE
+class $modify(BetterVisualsScissorHook, CCEGLViewProtocol) {
+    void setScissorInPoints(float x, float y, float w, float h) {
+        scaleCaptureScissor(x, y, w, h);
+        CCEGLViewProtocol::setScissorInPoints(x, y, w, h);
+    }
+};
+#endif
 
 #ifdef GEODE_IS_WINDOWS
 class $modify(BetterVisualsEGLViewHook, CCEGLView) {
