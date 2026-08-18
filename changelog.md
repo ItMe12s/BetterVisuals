@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0
+
+add stuff here...
+
 ## 2.2.1
 
 - Added mobile device support for fullscreen effects
