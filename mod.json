@@ -123,7 +123,10 @@
 				"Off",
 				"FXAA",
 				"SMAA High",
-				"SMAA Ultra"
+				"SMAA Ultra",
+				"SSAA 1.5x",
+				"SSAA 2x",
+				"SSAA 3x"
 			]
 		},
 		"sharpening-title": {

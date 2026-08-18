@@ -18,6 +18,8 @@ void main() {
 )glsl";
 
     extern render::PostProcessShader const kFxaaShader;
+    extern render::PostProcessShader const kSsaaShader;
+    extern render::PostProcessShader const kSsaa3xShader;
     extern render::PostProcessShader const kCasShader;
     extern render::PostProcessShader const kGrayscaleShader;
     extern render::PostProcessShader const kPixelateShader;

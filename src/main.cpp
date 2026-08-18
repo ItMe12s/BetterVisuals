@@ -15,7 +15,7 @@
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/platform/cplatform.h>
-#include <Geode/ui/Popup.hpp>
+#include <Geode/ui/PopupManager.hpp>
 #ifdef GEODE_IS_WINDOWS
     #include <Geode/modify/CCEGLView.hpp>
 #endif
@@ -38,9 +38,21 @@ namespace {
     enum class AntiAliasingMethod {
         Off,
         Fxaa,
+        Ssaa150,
+        Ssaa200,
+        Ssaa300,
         SmaaHigh,
         SmaaUltra,
     };
+
+    float ssaaFactor(AntiAliasingMethod method) {
+        switch (method) {
+            case AntiAliasingMethod::Ssaa150: return 1.5f;
+            case AntiAliasingMethod::Ssaa200: return 2.f;
+            case AntiAliasingMethod::Ssaa300: return 3.f;
+            default: return 1.f;
+        }
+    }
 
     enum class UpscaleMethod {
         Nearest,
@@ -77,6 +89,7 @@ namespace {
         GLsizei width = 0;
         GLsizei height = 0;
         bool needsPresentation = false;
+        bool needsDownsample = false;
 
         bool operator==(PostProcessKey const&) const = default;
     };
@@ -115,6 +128,7 @@ namespace {
     std::atomic<bool> g_disablePopupShown = false;
     bv::render::PostProcessPipeline g_postProcessPipeline;
     bv::render::PostProcessRenderer g_fxaaRenderer;
+    bv::render::PostProcessRenderer g_ssaaRenderer;
     bv::render::PostProcessRenderer g_renderScaleRenderer;
     bv::render::PostProcessRenderer g_fsrRenderer;
     bv::render::PostProcessRenderer g_casRenderer;
@@ -156,6 +170,7 @@ namespace {
     void resetRenderResources() {
         g_postProcessPipeline.reset();
         g_fxaaRenderer.reset();
+        g_ssaaRenderer.reset();
         g_renderScaleRenderer.reset();
         g_fsrRenderer.reset();
         g_casRenderer.reset();
@@ -172,6 +187,17 @@ namespace {
         g_failedPostProcessKey.reset();
     }
 
+    void showSsaaWarning() {
+        auto popup = PopupManager::get().quickPopup(
+            "SSAA Warning",
+            "SSAA renders the game at a higher resolution before downsampling, "
+            "which is extremely demanding. "
+            "Use it only for showcasing or on top-of-the-line GPUs!!!",
+            "Ok"
+        );
+        popup->show();
+    }
+
     void updateAntiAliasingMethod(std::string_view value) {
         if (value == "SMAA High") {
             g_antiAliasingMethod.store(AntiAliasingMethod::SmaaHigh, std::memory_order_relaxed);
@@ -179,6 +205,18 @@ namespace {
         }
         if (value == "SMAA Ultra") {
             g_antiAliasingMethod.store(AntiAliasingMethod::SmaaUltra, std::memory_order_relaxed);
+            return;
+        }
+        if (value == "SSAA 1.5x") {
+            g_antiAliasingMethod.store(AntiAliasingMethod::Ssaa150, std::memory_order_relaxed);
+            return;
+        }
+        if (value == "SSAA 2x") {
+            g_antiAliasingMethod.store(AntiAliasingMethod::Ssaa200, std::memory_order_relaxed);
+            return;
+        }
+        if (value == "SSAA 3x") {
+            g_antiAliasingMethod.store(AntiAliasingMethod::Ssaa300, std::memory_order_relaxed);
             return;
         }
         if (value == "FXAA") {
@@ -272,6 +310,12 @@ namespace {
                 prepared = prepared &&
                     g_fxaaRenderer.prepare(bv::shaders::kFxaaShader, key.width, key.height);
                 break;
+            case AntiAliasingMethod::Ssaa150:
+            case AntiAliasingMethod::Ssaa200:
+            case AntiAliasingMethod::Ssaa300:
+                g_fxaaRenderer.reset();
+                g_smaaRenderer.reset();
+                break;
             case AntiAliasingMethod::SmaaHigh:
                 g_fxaaRenderer.reset();
                 prepared = prepared &&
@@ -334,12 +378,23 @@ namespace {
         }
 
         if (prepared && key.needsPresentation) {
-            if (config.upscaling == UpscaleMethod::Fsr) {
+            if (key.needsDownsample) {
+                g_fsrRenderer.reset();
                 g_renderScaleRenderer.reset();
+                g_ssaaRenderer.reset();
+                auto const& ssaaShader = config.aa == AntiAliasingMethod::Ssaa300 ?
+                    bv::shaders::kSsaa3xShader :
+                    bv::shaders::kSsaaShader;
+                prepared = g_ssaaRenderer.prepare(ssaaShader, key.width, key.height);
+            }
+            else if (config.upscaling == UpscaleMethod::Fsr) {
+                g_renderScaleRenderer.reset();
+                g_ssaaRenderer.reset();
                 prepared = g_fsrRenderer.prepare(bv::shaders::kFsrShader, key.width, key.height);
             }
             else {
                 g_fsrRenderer.reset();
+                g_ssaaRenderer.reset();
                 prepared = g_renderScaleRenderer.prepare(
                     bv::shaders::kRenderScaleShader, key.width, key.height
                 );
@@ -348,6 +403,7 @@ namespace {
         else if (!key.needsPresentation) {
             g_renderScaleRenderer.reset();
             g_fsrRenderer.reset();
+            g_ssaaRenderer.reset();
         }
 
         if (prepared) {
@@ -388,6 +444,9 @@ namespace {
                     g_smaaRenderer.apply(g_postProcessPipeline.currentTexture(), target);
                 });
                 break;
+            case AntiAliasingMethod::Ssaa150:
+            case AntiAliasingMethod::Ssaa200:
+            case AntiAliasingMethod::Ssaa300:
             case AntiAliasingMethod::Off: break;
         }
         if (config.cas) {
@@ -439,9 +498,11 @@ namespace {
 
         auto const effectCount = config.effectCount();
         auto const renderScale = g_renderScale.load(std::memory_order_relaxed);
-        auto const internalWidth = scaledDimension(width, renderScale);
-        auto const internalHeight = scaledDimension(height, renderScale);
+        auto const effectiveScale = renderScale * ssaaFactor(config.aa);
+        auto const internalWidth = scaledDimension(width, effectiveScale);
+        auto const internalHeight = scaledDimension(height, effectiveScale);
         auto const needsPresentation = internalWidth != width || internalHeight != height;
+        auto const needsDownsample = internalWidth > width || internalHeight > height;
         if (effectCount == 0 && !needsPresentation) {
             if (g_preparedPostProcessKey || g_failedPostProcessKey) {
                 resetRenderResources();
@@ -450,7 +511,9 @@ namespace {
             return;
         }
 
-        PostProcessKey const key{config, internalWidth, internalHeight, needsPresentation};
+        PostProcessKey const key{
+            config, internalWidth, internalHeight, needsPresentation, needsDownsample
+        };
         PostProcessFailureKey const failureKey{
             key,
             static_cast<GLuint>(callerFramebuffer),
@@ -509,19 +572,20 @@ namespace {
                 auto const sourceTexture = g_postProcessPipeline.currentTexture();
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, sourceTexture);
+                auto const linearSampling =
+                    needsDownsample || config.upscaling == UpscaleMethod::Bilinear;
                 glTexParameteri(
-                    GL_TEXTURE_2D,
-                    GL_TEXTURE_MIN_FILTER,
-                    config.upscaling == UpscaleMethod::Bilinear ? GL_LINEAR : GL_NEAREST
+                    GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linearSampling ? GL_LINEAR : GL_NEAREST
                 );
                 glTexParameteri(
-                    GL_TEXTURE_2D,
-                    GL_TEXTURE_MAG_FILTER,
-                    config.upscaling == UpscaleMethod::Bilinear ? GL_LINEAR : GL_NEAREST
+                    GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linearSampling ? GL_LINEAR : GL_NEAREST
                 );
                 glBindFramebuffer(GL_FRAMEBUFFER, callerTarget.framebuffer);
                 glViewport(callerTarget.x, callerTarget.y, callerTarget.width, callerTarget.height);
-                if (config.upscaling == UpscaleMethod::Fsr) {
+                if (needsDownsample) {
+                    g_ssaaRenderer.apply(sourceTexture);
+                }
+                else if (config.upscaling == UpscaleMethod::Fsr) {
                     g_fsrRenderer.apply(sourceTexture, g_fsrSharpness.load(std::memory_order_relaxed));
                 }
                 else {
@@ -555,7 +619,15 @@ $on_mod(Loaded) {
     listenForSettingChanges<bool>("full-scene-effects", applyFullScene);
     bindDoubleSetting("render-scale", g_renderScale);
     bindStringSetting("upscale-method", updateUpscaleMethod);
-    bindStringSetting("aa-method", updateAntiAliasingMethod);
+    updateAntiAliasingMethod(Mod::get()->getSettingValue<std::string>("aa-method"));
+    listenForSettingChanges<std::string>("aa-method", [](std::string value) {
+        auto const wasSsaa = ssaaFactor(g_antiAliasingMethod.load(std::memory_order_relaxed)) > 1.f;
+        updateAntiAliasingMethod(value);
+        auto const isSsaa = ssaaFactor(g_antiAliasingMethod.load(std::memory_order_relaxed)) > 1.f;
+        if (!wasSsaa && isSsaa) {
+            showSsaaWarning();
+        }
+    });
     bindBoolSetting("cas-enabled", g_casEnabled);
     bindDoubleSetting("cas-sharpness", g_casSharpness);
     bindDoubleSetting("fsr-sharpness", g_fsrSharpness);

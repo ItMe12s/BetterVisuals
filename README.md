@@ -6,11 +6,11 @@ Pro tip: You can change the settings in pause menus.
 
 Recommended settings:
 
-- `Max FPS`: 0.5x + Bilinear, AA off, Sharpening off. (Try this)
-- `Better FPS`: 0.7x + Bilinear, AA off, Sharpening off. (or FSR 1)
-- `Better Visuals`: 1x, SMAA High, Sharpening off. (Default)
+- `Max FPS`: 0.5x + Bilinear, AA off, Sharpening off.
+- `Better FPS`: 0.7x + Bilinear, AA off, Sharpening off. (Or FSR 1)
+- `Better Visuals`: 1x, SMAA High, Sharpening off.
 - `Stream/Record`: 1x, SMAA High, Sharpening on.
-- `YT Showcase`: 1x, SMAA Ultra, Sharpening on.
+- `YT Showcase`: 1x, SSAA 1.5x, Sharpening on. (Or SSAA 3x)
 
 *May distort text and UI elements.*
 
@@ -40,12 +40,15 @@ Makes the game look better while playing levels.
 Available methods:
 
 - FXAA
-- SMAA High (default)
+- SMAA High (Default)
 - SMAA Ultra
+- SSAA 1.5x, 2x, 3x
 
 FXAA is the fastest.
-SMAA High adds better quality with minimal performance cost,
-while SMAA Ultra is overkill except for extreme resolutions like 720p or 4K on large screens.
+SMAA High adds better quality with minimal performance cost.
+SMAA Ultra is overkill except for extreme resolutions like 720p or 4K on large screens.
+SSAA renders at higher resolution, then downsamples for maximum quality at maximum cost.
+It multiplies with Render Scale, so a combined factor of 1x or below has no effect.
 
 ---
 

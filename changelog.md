@@ -2,7 +2,7 @@
 
 ## 2.3.0
 
-add stuff here...
+- Added Supersampling Anti-Aliasing
 
 ## 2.2.1
 
