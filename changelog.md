@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.1
+
+- Added Node IDs to dependencies (fixed crash in pause menus)
+
 ## 2.3.0
 
 - Added Supersampling Anti-Aliasing
