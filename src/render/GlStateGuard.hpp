@@ -33,7 +33,7 @@ namespace bv::render {
         GLboolean cullFace = GL_FALSE;
         GLint framebuffer = 0;
         GLint renderbuffer = 0;
-        std::array<VertexAttributeState, 2> attributes = {};
+        std::array<VertexAttributeState, 3> attributes = {};
 
         bool operator==(GlState const&) const = default;
     };

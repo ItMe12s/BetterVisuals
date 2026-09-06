@@ -187,6 +187,14 @@ namespace {
         g_failedPostProcessKey.reset();
     }
 
+    void teardownDisabledPostProcess() {
+        if ((!g_modEnabled.load(std::memory_order_relaxed) ||
+             g_temporarilyDisabled.load(std::memory_order_relaxed)) &&
+            (g_preparedPostProcessKey || g_failedPostProcessKey)) {
+            resetRenderResources();
+        }
+    }
+
     void showSsaaWarning() {
         auto popup = PopupManager::get().quickPopup(
             "SSAA Warning",
@@ -689,6 +697,7 @@ class $modify(BetterVisualsGameLayer, GJBaseGameLayer) {
             !g_modEnabled.load(std::memory_order_relaxed) ||
             g_fullSceneEnabled.load(std::memory_order_relaxed) || g_isSceneVisitActive ||
             static_cast<GJBaseGameLayer*>(this) != GJBaseGameLayer::get()) {
+            teardownDisabledPostProcess();
             GJBaseGameLayer::visit();
             return;
         }
@@ -716,6 +725,7 @@ class $modify(BetterVisualsSceneVisitHook, CCNode) {
             g_temporarilyDisabled.load(std::memory_order_relaxed) ||
             !g_modEnabled.load(std::memory_order_relaxed) || g_isSceneVisitActive ||
             static_cast<CCNode*>(this) != CCDirector::get()->getRunningScene()) {
+            teardownDisabledPostProcess();
             CCNode::visit();
             return;
         }

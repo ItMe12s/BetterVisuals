@@ -26,7 +26,10 @@ namespace bv::render {
 
     bool FullscreenQuad::initialize(std::string_view label) {
         if (m_vbo != 0) {
-            return true;
+            if (glIsBuffer(m_vbo) == GL_TRUE) {
+                return true;
+            }
+            m_vbo = 0;
         }
 
         glGenBuffers(1, &m_vbo);

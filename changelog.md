@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.2
+
+- Fixed solid textures after disabling the mod in pause menus
+- Fixed split image after graphics reset
+- Preserve texcoord attrib during passes
+
 ## 2.3.1
 
 - Added Node IDs to dependencies (fixed crash in pause menus)

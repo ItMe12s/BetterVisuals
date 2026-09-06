@@ -2,6 +2,7 @@
 
 #include "FullscreenQuad.hpp"
 
+#include <Geode/cocos/shaders/CCGLProgram.h>
 #include <cassert>
 #include <cstddef>
 
@@ -78,12 +79,17 @@ namespace bv::render {
 
         state.attributes[0] = captureVertexAttribute(FullscreenQuad::kPositionAttribute);
         state.attributes[1] = captureVertexAttribute(FullscreenQuad::kTexCoordAttribute);
+        state.attributes[2] =
+            captureVertexAttribute(static_cast<GLuint>(cocos2d::kCCVertexAttrib_TexCoords));
         return state;
     }
 
     void restoreGlState(GlState const& state) {
         restoreVertexAttribute(FullscreenQuad::kPositionAttribute, state.attributes[0]);
         restoreVertexAttribute(FullscreenQuad::kTexCoordAttribute, state.attributes[1]);
+        restoreVertexAttribute(
+            static_cast<GLuint>(cocos2d::kCCVertexAttrib_TexCoords), state.attributes[2]
+        );
         glBindBuffer(GL_ARRAY_BUFFER, state.arrayBuffer);
 
         for (std::size_t index = 0; index < state.textures2D.size(); ++index) {
