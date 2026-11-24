@@ -22,7 +22,7 @@
 		"source": "https://github.com/ItMe12s/BetterVisuals"
 	},
 	"dependencies": {
-		"geode.node-ids": ">=1.23.3"
+		"geode.node-ids": ">=1.24.0-beta.1"
 	},
 	"resources": {
 		"sprites": [

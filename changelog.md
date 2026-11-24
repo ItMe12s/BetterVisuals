@@ -3,6 +3,7 @@
 ## 2.3.3
 
 - Updated to Geode 6.0.0-beta.3
+- Updated to Node IDs 1.24.0-beta.1
 
 ## 2.3.2
 

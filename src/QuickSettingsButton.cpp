@@ -13,7 +13,8 @@ public:
 };
 
 void makeSettingsButton(CCLayer* parent, char const* menuId) {
-    auto menu = parent->getChildByID(menuId);
+    auto menu = parent->getChildByIDRecursive(menuId);
+    if (!menu) return;
     auto spr = CCSprite::create("Button.png"_spr);
     auto size = spr->getContentSize();
     auto scale = 40.f / size.width;
