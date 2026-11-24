@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.3
+
+- Updated to Geode 6.0.0-beta.3
+
 ## 2.3.2
 
 - (hopefully) fixed solid textures after disabling the mod in pause menus and other bugs
